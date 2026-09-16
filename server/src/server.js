@@ -41,10 +41,9 @@ app.get('/', (req, res) => {
   res.send('✈️ Tourist Trip Planner API Server is running!');
 });
 
-// Port configuration
-const PORT = process.env.PORT || 5000;
-
-if (!process.env.VERCEL) {
+// Only start standalone HTTP server when executed directly (node src/server.js)
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`[Server] Anti Travel Backend listening on port ${PORT}`);
     console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
