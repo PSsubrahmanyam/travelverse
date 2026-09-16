@@ -54,10 +54,11 @@ export default function SupportForm() {
           {
             _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
             _replyto: formData.email,
-            name: formData.name,
-            email: formData.email,
-            supportType: formData.supportType,
-            message: formData.message,
+            _template: 'table',
+            'Full Name': formData.name,
+            'User Email': formData.email,
+            'Help Category': formData.supportType,
+            'Message Details': formData.message,
           },
           {
             headers: {

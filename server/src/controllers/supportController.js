@@ -85,10 +85,11 @@ const submitSupportTicket = async (req, res) => {
           {
             _subject: `🚨 [AntiTravel Support] New Query from ${name} (${supportType || 'General'})`,
             _replyto: email,
-            name,
-            email,
-            supportType: supportType || 'General Query',
-            message,
+            _template: 'table',
+            'Full Name': name,
+            'User Email': email,
+            'Help Category': supportType || 'General Query',
+            'Message Details': message,
           },
           {
             headers: {
