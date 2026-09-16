@@ -663,9 +663,75 @@ function addMinsToTime(timeStr, minsToAdd) {
 
 // All-India Universal Route & Timetable Resolver
 function findTrainsBetweenStations(fromCode, toCode) {
-  if (!fromCode || !toCode) return [];
-  const fromClean = fromCode.toUpperCase().trim();
-  const toClean = toCode.toUpperCase().trim();
+  const fromClean = fromCode ? fromCode.toUpperCase().trim() : '';
+  const toClean = toCode ? toCode.toUpperCase().trim() : '';
+
+  if (!fromClean && !toClean) {
+    return POPULAR_TRAINS.map((train) => {
+      const firstStop = train.schedule[0];
+      const lastStop = train.schedule[train.schedule.length - 1];
+      const distance = Math.abs(lastStop.distanceKm - firstStop.distanceKm);
+      return {
+        ...train,
+        departureTime: firstStop.dep !== 'Destination' ? firstStop.dep : firstStop.arr,
+        arrivalTime: lastStop.arr !== 'Source' ? lastStop.arr : lastStop.dep,
+        fromStation: firstStop.stationName,
+        fromCode: firstStop.stationCode,
+        fromPf: firstStop.pf || '1',
+        toStation: lastStop.stationName,
+        toCode: lastStop.stationCode,
+        toPf: lastStop.pf || '1',
+        distanceKm: distance || 500,
+        durationStr: calculateDuration(firstStop.dep !== 'Destination' ? firstStop.dep : firstStop.arr, lastStop.arr !== 'Source' ? lastStop.arr : lastStop.dep)
+      };
+    });
+  }
+
+  if (fromClean && !toClean) {
+    return POPULAR_TRAINS.filter((t) =>
+      t.schedule.some((s) => s.stationCode === fromClean || s.stationName.toUpperCase().includes(fromClean))
+    ).map((train) => {
+      const fromStop = train.schedule.find((s) => s.stationCode === fromClean || s.stationName.toUpperCase().includes(fromClean)) || train.schedule[0];
+      const lastStop = train.schedule[train.schedule.length - 1];
+      const distance = Math.abs(lastStop.distanceKm - fromStop.distanceKm);
+      return {
+        ...train,
+        departureTime: fromStop.dep !== 'Destination' ? fromStop.dep : fromStop.arr,
+        arrivalTime: lastStop.arr !== 'Source' ? lastStop.arr : lastStop.dep,
+        fromStation: fromStop.stationName,
+        fromCode: fromStop.stationCode,
+        fromPf: fromStop.pf || '1',
+        toStation: lastStop.stationName,
+        toCode: lastStop.stationCode,
+        toPf: lastStop.pf || '1',
+        distanceKm: distance || 300,
+        durationStr: calculateDuration(fromStop.dep !== 'Destination' ? fromStop.dep : fromStop.arr, lastStop.arr !== 'Source' ? lastStop.arr : lastStop.dep)
+      };
+    });
+  }
+
+  if (!fromClean && toClean) {
+    return POPULAR_TRAINS.filter((t) =>
+      t.schedule.some((s) => s.stationCode === toClean || s.stationName.toUpperCase().includes(toClean))
+    ).map((train) => {
+      const firstStop = train.schedule[0];
+      const toStop = train.schedule.find((s) => s.stationCode === toClean || s.stationName.toUpperCase().includes(toClean)) || train.schedule[train.schedule.length - 1];
+      const distance = Math.abs(toStop.distanceKm - firstStop.distanceKm);
+      return {
+        ...train,
+        departureTime: firstStop.dep !== 'Destination' ? firstStop.dep : firstStop.arr,
+        arrivalTime: toStop.arr !== 'Source' ? toStop.arr : toStop.dep,
+        fromStation: firstStop.stationName,
+        fromCode: firstStop.stationCode,
+        fromPf: firstStop.pf || '1',
+        toStation: toStop.stationName,
+        toCode: toStop.stationCode,
+        toPf: toStop.pf || '1',
+        distanceKm: distance || 300,
+        durationStr: calculateDuration(firstStop.dep !== 'Destination' ? firstStop.dep : firstStop.arr, toStop.arr !== 'Source' ? toStop.arr : toStop.dep)
+      };
+    });
+  }
 
   const getStopDetails = (train, targetCode) => {
     // 1. Direct explicit match in train schedule

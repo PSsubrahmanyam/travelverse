@@ -33,12 +33,12 @@ import {
   Radio,
 } from 'lucide-react';
 
-export default function WhereIsMyTrain({ initialFrom = 'VSKP', initialTo = 'RJY' }) {
+export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
   const [activeSubTab, setActiveSubTab] = useState('between'); // 'between' | 'live' | 'station' | 'pnr'
 
   // Tab 1 State: Trains Between Stations
-  const [fromCode, setFromCode] = useState(initialFrom);
-  const [toCode, setToCode] = useState(initialTo);
+  const [fromCode, setFromCode] = useState('');
+  const [toCode, setToCode] = useState('');
   const [journeyDate, setJourneyDate] = useState('today');
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [selectedQuota, setSelectedQuota] = useState('GN');
@@ -47,8 +47,8 @@ export default function WhereIsMyTrain({ initialFrom = 'VSKP', initialTo = 'RJY'
   const [sortBy, setSortBy] = useState('DEP_ASC'); // 'DEP_ASC' | 'DEP_DESC' | 'DURATION_ASC' | 'ARR_ASC'
 
   // Autocomplete search inputs
-  const [fromSearch, setFromSearch] = useState('Visakhapatnam (VSKP)');
-  const [toSearch, setToSearch] = useState('Rajahmundry (RJY)');
+  const [fromSearch, setFromSearch] = useState('');
+  const [toSearch, setToSearch] = useState('');
   const [showFromDropdown, setShowFromDropdown] = useState(false);
   const [showToDropdown, setShowToDropdown] = useState(false);
 
@@ -252,11 +252,13 @@ export default function WhereIsMyTrain({ initialFrom = 'VSKP', initialTo = 'RJY'
                       type="text"
                       value={fromSearch}
                       onChange={(e) => {
-                        setFromSearch(e.target.value);
+                        const val = e.target.value;
+                        setFromSearch(val);
+                        if (!val.trim()) setFromCode('');
                         setShowFromDropdown(true);
                       }}
                       onFocus={() => setShowFromDropdown(true)}
-                      placeholder="Type station name or code..."
+                      placeholder="Type station name/code (or leave blank for All)..."
                       className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-amber-500 transition-all pr-8"
                     />
                     <MapPin className="w-4 h-4 text-amber-400 absolute right-3 top-3.5" />
@@ -309,11 +311,13 @@ export default function WhereIsMyTrain({ initialFrom = 'VSKP', initialTo = 'RJY'
                       type="text"
                       value={toSearch}
                       onChange={(e) => {
-                        setToSearch(e.target.value);
+                        const val = e.target.value;
+                        setToSearch(val);
+                        if (!val.trim()) setToCode('');
                         setShowToDropdown(true);
                       }}
                       onFocus={() => setShowToDropdown(true)}
-                      placeholder="Type station name or code..."
+                      placeholder="Type station name/code (or leave blank for All)..."
                       className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-amber-500 transition-all pr-8"
                     />
                     <MapPin className="w-4 h-4 text-sky-400 absolute right-3 top-3.5" />
@@ -401,6 +405,17 @@ export default function WhereIsMyTrain({ initialFrom = 'VSKP', initialTo = 'RJY'
               {/* Popular Authentic Routes Quick Chips */}
               <div className="mt-4 pt-3 flex items-center space-x-2 text-xs overflow-x-auto">
                 <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] flex-shrink-0">Popular Routes:</span>
+                <button
+                  onClick={() => {
+                    setFromCode('');
+                    setFromSearch('');
+                    setToCode('');
+                    setToSearch('');
+                  }}
+                  className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-3 py-1 rounded-full border border-amber-500/40 flex-shrink-0 font-bold transition-colors cursor-pointer"
+                >
+                  ✨ Show All National Trains
+                </button>
                 {[
                   { from: 'VSKP', fromName: 'Visakhapatnam (VSKP)', to: 'RJY', toName: 'Rajahmundry (RJY)' },
                   { from: 'VSKP', fromName: 'Visakhapatnam (VSKP)', to: 'SC', toName: 'Secunderabad (SC)' },
