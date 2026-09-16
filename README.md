@@ -1,6 +1,11 @@
-# ✈️ AntiTravel - Smart Tourist Trip Planner
+# ✈️ AntiTravel / Travelverse - Smart Tourist Trip Planner
 
-A complete, responsive, full-stack tourist trip planner web application built with **React 18 + Vite**, **Tailwind CSS**, **Leaflet.js**, **Node.js / Express**, **MongoDB Atlas**, and **Google Gemini AI API**.
+[![Live Demo](https://img.shields.io/badge/Live_Demo-travelverse--1.vercel.app-brightgreen?style=for-the-badge&logo=vercel)](https://travelverse-1.vercel.app/)
+[![GitHub Repo](https://img.shields.io/badge/GitHub-PSsubrahmanyam%2Ftravelverse-blue?style=for-the-badge&logo=github)](https://github.com/PSsubrahmanyam/travelverse.git)
+
+🌐 **Live Website URL**: **[https://travelverse-1.vercel.app/](https://travelverse-1.vercel.app/)**
+
+A complete, responsive, full-stack tourist trip planner web application built with **React 18 + Vite**, **Tailwind CSS**, **Leaflet.js**, **Node.js / Express**, **MongoDB Atlas**, and **Groq / AI API**.
 
 ---
 
