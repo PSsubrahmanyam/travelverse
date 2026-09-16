@@ -44,7 +44,13 @@ app.get('/', (req, res) => {
 // Port configuration
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`[Server] Anti Travel Backend listening on port ${PORT}`);
-  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`[Server] Anti Travel Backend listening on port ${PORT}`);
+    console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+// Export Express app for Vercel Serverless Functions
+module.exports = app;
+
