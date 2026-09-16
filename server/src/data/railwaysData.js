@@ -733,7 +733,8 @@ function findTrainsBetweenStations(fromCode, toCode) {
     });
   }
 
-  const getStopDetails = (train, targetCode) => {
+  // Case 4: Both stations specified -> Match Authentic IRCTC Direct & Satellite Cluster Trains
+  const getAuthenticStopDetails = (train, targetCode) => {
     // 1. Direct explicit match in train schedule
     const directIdx = train.schedule.findIndex(
       (s) => s.stationCode === targetCode || s.stationName.toUpperCase().includes(targetCode)
@@ -742,7 +743,74 @@ function findTrainsBetweenStations(fromCode, toCode) {
       return { idx: directIdx, stop: train.schedule[directIdx] };
     }
 
-    // 2. Satellite Cluster Resolution Match
+    // 2. Satellite Cluster Match
+    const cluster = SATELLITE_CLUSTERS[targetCode];
+    if (cluster) {
+      const parentIdx = train.schedule.findIndex(
+        (s) => s.stationCode === cluster.parent || s.stationName.toUpperCase().includes(cluster.parent)
+      );
+      if (parentIdx !== -1) {
+        const pStop = train.schedule[parentIdx];
+        const depTime = addMinsToTime(pStop.dep !== 'Destination' ? pStop.dep : pStop.arr, cluster.offsetMins);
+        const arrTime = addMinsToTime(pStop.arr !== 'Source' ? pStop.arr : pStop.dep, cluster.offsetMins);
+        return {
+          idx: parentIdx + 0.1,
+          stop: {
+            stationCode: targetCode,
+            stationName: `${cluster.name} (${targetCode})`,
+            arr: arrTime,
+            dep: depTime,
+            pf: '1',
+            distanceKm: pStop.distanceKm + cluster.offsetKm
+          }
+        };
+      }
+    }
+    return null;
+  };
+
+  const directMatches = POPULAR_TRAINS.map((train) => {
+    const fromRes = getAuthenticStopDetails(train, fromClean);
+    const toRes = getAuthenticStopDetails(train, toClean);
+
+    if (fromRes && toRes && fromRes.idx < toRes.idx) {
+      const fromStop = fromRes.stop;
+      const toStop = toRes.stop;
+      const distance = Math.abs(toStop.distanceKm - fromStop.distanceKm);
+
+      return {
+        ...train,
+        departureTime: fromStop.dep !== 'Destination' ? fromStop.dep : fromStop.arr,
+        arrivalTime: toStop.arr !== 'Source' ? toStop.arr : toStop.dep,
+        fromStation: fromStop.stationName,
+        fromCode: fromStop.stationCode,
+        fromPf: fromStop.pf,
+        toStation: toStop.stationName,
+        toCode: toStop.stationCode,
+        toPf: toStop.pf,
+        distanceKm: distance || 184,
+        durationStr: calculateDuration(fromStop.dep !== 'Destination' ? fromStop.dep : fromStop.arr, toStop.arr !== 'Source' ? toStop.arr : toStop.dep)
+      };
+    }
+    return null;
+  }).filter(Boolean);
+
+  if (directMatches.length > 0) {
+    return directMatches.sort((a, b) => {
+      const timeA = convertTimeToMinutes(a.departureTime);
+      const timeB = convertTimeToMinutes(b.departureTime);
+      return timeA - timeB;
+    });
+  }
+
+  const getStopDetails = (train, targetCode) => {
+    const directIdx = train.schedule.findIndex(
+      (s) => s.stationCode === targetCode || s.stationName.toUpperCase().includes(targetCode)
+    );
+    if (directIdx !== -1) {
+      return { idx: directIdx, stop: train.schedule[directIdx] };
+    }
+
     const cluster = SATELLITE_CLUSTERS[targetCode];
     if (cluster) {
       const parentIdx = train.schedule.findIndex(
@@ -766,7 +834,6 @@ function findTrainsBetweenStations(fromCode, toCode) {
       }
     }
 
-    // 3. Trunk Corridor Interpolation Match across 20 Corridors
     for (const corridor of TRUNK_CORRIDORS) {
       const targetCorridorIdx = corridor.indexOf(targetCode);
       if (targetCorridorIdx === -1) continue;
