@@ -61,8 +61,8 @@ export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
   const [isInsideTrainMode, setIsInsideTrainMode] = useState(true);
 
   // Tab 3 State: Live Station Board
-  const [stationQuery, setStationQuery] = useState('RJY');
-  const [stationBoardData, setStationBoardData] = useState(() => getLiveStationBoard('RJY'));
+  const [stationQuery, setStationQuery] = useState('');
+  const [stationBoardData, setStationBoardData] = useState(null);
 
 
 
@@ -107,7 +107,9 @@ export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
 
   // Find Trains Between Stations (Authentic Schedule Only with Advanced Sorting & Filters)
   const searchResults = useMemo(() => {
-    let list = findTrainsBetweenStations(fromCode, toCode);
+    const queryFrom = fromCode || fromSearch;
+    const queryTo = toCode || toSearch;
+    let list = findTrainsBetweenStations(queryFrom, queryTo);
 
     if (selectedClass !== 'ALL') {
       list = list.filter((t) => t.classes.includes(selectedClass));
@@ -201,7 +203,7 @@ export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
             Where Is My <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-sky-400 to-blue-400">Train</span>
           </h2>
           <p className="text-slate-400 text-sm mt-2">
-            Find authentic Indian Railways train schedules, spot real-time train location, inspect coach positions & NTES live station boards.
+            Browse all authentic Indian Railways train schedules, inspect coach layouts & live station boards without any forced station selection.
           </p>
         </div>
 
