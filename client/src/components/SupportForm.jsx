@@ -31,41 +31,52 @@ export default function SupportForm() {
     setLoading(true);
     setSubmittedData(null);
 
-    try {
-      // 1. Prepare FormData payload for FormSubmit
-      const fd = new FormData();
-      fd.append('Full Name', formData.name);
-      fd.append('User Email', formData.email);
-      fd.append('Help Category', formData.supportType);
-      fd.append('Message Details', formData.message);
-      fd.append('_subject', `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`);
-      fd.append('_replyto', formData.email);
-      fd.append('_captcha', 'false');
-      fd.append('_template', 'table');
+    const payload = {
+      _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
+      _replyto: formData.email,
+      _captcha: 'false',
+      _template: 'table',
+      'Full Name': formData.name,
+      'User Email': formData.email,
+      'Help Category': formData.supportType,
+      'Message Details': formData.message,
+    };
 
-      // Direct Browser Dispatch via FormSubmit
+    let sent = false;
+
+    // 1. Direct Browser Dispatch via FormSubmit JSON
+    try {
       const fsRes = await axios.post(
         'https://formsubmit.co/ajax/shanmukhparimi82@gmail.com',
-        fd,
+        payload,
         {
           headers: {
+            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
         }
       );
 
-      setSubmittedData({
-        success: true,
-        targetEmail: 'shanmukhparimi82@gmail.com',
-        message: 'Support ticket sent directly to your email!',
-      });
+      if (fsRes.data && (fsRes.data.success === 'true' || fsRes.data.success === true)) {
+        setSubmittedData({
+          success: true,
+          targetEmail: 'shanmukhparimi82@gmail.com',
+          message: 'Support ticket sent directly to your email!',
+        });
+        sent = true;
+      }
     } catch (fsErr) {
       console.warn('Direct FormSubmit failed, trying backend endpoint:', fsErr.message);
+    }
+
+    // 2. Fallback to backend API endpoint if FormSubmit fails
+    if (!sent) {
       try {
         const apiBase = import.meta.env.VITE_API_BASE_URL || '';
         const res = await axios.post(`${apiBase}/api/support/contact`, formData);
         if (res.data) {
           setSubmittedData(res.data);
+          sent = true;
         }
       } catch (err) {
         setSubmittedData({
