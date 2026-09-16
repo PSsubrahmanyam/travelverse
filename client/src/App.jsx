@@ -5,7 +5,6 @@ import CategoryFilter from './components/CategoryFilter';
 import DestinationCard from './components/DestinationCard';
 import MapView from './components/MapView';
 import BudgetCalculator from './components/BudgetCalculator';
-import WhereIsMyTrain from './components/WhereIsMyTrain';
 import AIChatbot from './components/AIChatbot';
 import SupportForm from './components/SupportForm';
 import ReviewModal from './components/ReviewModal';
@@ -391,9 +390,6 @@ export default function App() {
 
       {/* 3. Dynamic Budget Estimator */}
       <BudgetCalculator />
-
-      {/* 4. Where Is My Train - Indian Railways Portal */}
-      <WhereIsMyTrain />
 
       {/* 5. Support & Contact Desk */}
       <SupportForm />

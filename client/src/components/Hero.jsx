@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Compass, Sparkles, MapPin, DollarSign, Train, Search, ArrowRight, Star, Heart, ShieldCheck } from 'lucide-react';
+import { Compass, Sparkles, MapPin, DollarSign, Search, ArrowRight, Star, Heart, ShieldCheck } from 'lucide-react';
 
 export default function Hero({ onExploreClick, onPlanClick, searchQuery, onSearchChange }) {
   // Showcase Carousel Destinations for Landing Animation
@@ -137,17 +137,6 @@ export default function Hero({ onExploreClick, onPlanClick, searchQuery, onSearc
               >
                 <DollarSign className="w-5 h-5 text-emerald-400" />
                 <span>Trip Budget</span>
-              </button>
-
-              <button
-                onClick={() => {
-                  const el = document.getElementById('trains');
-                  el?.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="inline-flex items-center space-x-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-7 py-3.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-95 cursor-pointer"
-              >
-                <Train className="w-5 h-5 text-slate-950" />
-                <span>Where is My Train</span>
               </button>
             </div>
 
