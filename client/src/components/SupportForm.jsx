@@ -49,7 +49,7 @@ export default function SupportForm() {
     // 2. Client-side FormSubmit Fallback to guarantee email inbox delivery
     if (!sent) {
       try {
-        await axios.post(
+        const fsRes = await axios.post(
           'https://formsubmit.co/ajax/shanmukhparimi82@gmail.com',
           {
             _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
@@ -67,10 +67,11 @@ export default function SupportForm() {
           }
         );
 
+        const returnMsg = (fsRes.data && fsRes.data.message) ? fsRes.data.message : 'Support ticket sent directly to email!';
         setSubmittedData({
           success: true,
           targetEmail: 'shanmukhparimi82@gmail.com',
-          message: 'Support ticket sent directly to email!',
+          message: returnMsg,
         });
         sent = true;
       } catch (fsErr) {

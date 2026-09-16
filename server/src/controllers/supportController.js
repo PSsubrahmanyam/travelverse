@@ -80,7 +80,7 @@ const submitSupportTicket = async (req, res) => {
     // Strategy B: FormSubmit Web Mailer Fallback to guarantee delivery to target email
     if (!mailSent) {
       try {
-        await axios.post(
+        const fsRes = await axios.post(
           `https://formsubmit.co/ajax/${adminEmail}`,
           {
             _subject: `🚨 [AntiTravel Support] New Query from ${name} (${supportType || 'General'})`,
@@ -94,9 +94,15 @@ const submitSupportTicket = async (req, res) => {
             headers: {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
+              'Origin': 'https://travelverse-1.vercel.app',
+              'Referer': 'https://travelverse-1.vercel.app/',
             },
           }
         );
+
+        if (fsRes.data && fsRes.data.message) {
+          console.log(`[FormSubmit Mailer] ${fsRes.data.message}`);
+        }
         mailSent = true;
         console.log(`[FormSubmit Mailer] Email dispatched to ${adminEmail}!`);
       } catch (fsErr) {
