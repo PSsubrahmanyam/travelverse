@@ -31,52 +31,41 @@ export default function SupportForm() {
     setLoading(true);
     setSubmittedData(null);
 
-    let sent = false;
-
-    // 1. Try Backend Serverless Endpoint
     try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-      const res = await axios.post(`${apiBase}/api/support/contact`, formData);
-
-      if (res.data) {
-        setSubmittedData(res.data);
-        sent = true;
-      }
-    } catch (err) {
-      console.warn('Backend support endpoint failed, switching to direct FormSubmit mailer:', err.message);
-    }
-
-    // 2. Client-side FormSubmit Fallback to guarantee email inbox delivery
-    if (!sent) {
-      try {
-        const fsRes = await axios.post(
-          'https://formsubmit.co/ajax/shanmukhparimi82@gmail.com',
-          {
-            _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
-            _replyto: formData.email,
-            _template: 'table',
-            'Full Name': formData.name,
-            'User Email': formData.email,
-            'Help Category': formData.supportType,
-            'Message Details': formData.message,
+      // 1. Direct Browser Dispatch via FormSubmit (Sends directly from user browser to shanmukhparimi82@gmail.com)
+      const fsRes = await axios.post(
+        'https://formsubmit.co/ajax/shanmukhparimi82@gmail.com',
+        {
+          _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
+          _replyto: formData.email,
+          _template: 'table',
+          'Full Name': formData.name,
+          'User Email': formData.email,
+          'Help Category': formData.supportType,
+          'Message Details': formData.message,
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-            },
-          }
-        );
+        }
+      );
 
-        const returnMsg = (fsRes.data && fsRes.data.message) ? fsRes.data.message : 'Support ticket sent directly to email!';
-        setSubmittedData({
-          success: true,
-          targetEmail: 'shanmukhparimi82@gmail.com',
-          message: returnMsg,
-        });
-        sent = true;
-      } catch (fsErr) {
-        console.error('FormSubmit fallback error:', fsErr.message);
+      setSubmittedData({
+        success: true,
+        targetEmail: 'shanmukhparimi82@gmail.com',
+        message: 'Support ticket sent directly to your email!',
+      });
+    } catch (fsErr) {
+      console.warn('Direct FormSubmit failed, trying backend endpoint:', fsErr.message);
+      try {
+        const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+        const res = await axios.post(`${apiBase}/api/support/contact`, formData);
+        if (res.data) {
+          setSubmittedData(res.data);
+        }
+      } catch (err) {
         setSubmittedData({
           success: true,
           targetEmail: 'shanmukhparimi82@gmail.com',
@@ -84,6 +73,12 @@ export default function SupportForm() {
         });
       }
     }
+
+    // Save ticket to backend DB in background
+    try {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      axios.post(`${apiBase}/api/support/contact`, formData).catch(() => {});
+    } catch (e) {}
 
     setFormData({
       name: '',
