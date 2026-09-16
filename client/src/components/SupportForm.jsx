@@ -32,21 +32,23 @@ export default function SupportForm() {
     setSubmittedData(null);
 
     try {
-      // 1. Direct Browser Dispatch via FormSubmit (Sends directly from user browser to shanmukhparimi82@gmail.com)
+      // 1. Prepare FormData payload for FormSubmit
+      const fd = new FormData();
+      fd.append('Full Name', formData.name);
+      fd.append('User Email', formData.email);
+      fd.append('Help Category', formData.supportType);
+      fd.append('Message Details', formData.message);
+      fd.append('_subject', `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`);
+      fd.append('_replyto', formData.email);
+      fd.append('_captcha', 'false');
+      fd.append('_template', 'table');
+
+      // Direct Browser Dispatch via FormSubmit
       const fsRes = await axios.post(
         'https://formsubmit.co/ajax/shanmukhparimi82@gmail.com',
-        {
-          _subject: `🚨 [AntiTravel Support] New Query from ${formData.name} (${formData.supportType})`,
-          _replyto: formData.email,
-          _template: 'table',
-          'Full Name': formData.name,
-          'User Email': formData.email,
-          'Help Category': formData.supportType,
-          'Message Details': formData.message,
-        },
+        fd,
         {
           headers: {
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
           },
         }
@@ -73,12 +75,6 @@ export default function SupportForm() {
         });
       }
     }
-
-    // Save ticket to backend DB in background
-    try {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
-      axios.post(`${apiBase}/api/support/contact`, formData).catch(() => {});
-    } catch (e) {}
 
     setFormData({
       name: '',
