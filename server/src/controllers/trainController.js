@@ -4,8 +4,7 @@ const {
   findTrainsBetweenStations,
   getLiveTrainStatus,
   getLiveStationBoard,
-  getPNRStatus,
-} = require('../../../client/src/data/railwaysData');
+} = require('../data/railwaysData');
 
 // @desc    Get all Indian Railway stations
 // @route   GET /api/trains/stations
