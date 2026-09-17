@@ -1,6 +1,8 @@
 let allIndiaData = null;
+let trainsList = [];
+let stationsList = [];
 const trainsMap = new Map();
-const stationsMap = new Map();
+const stationsCodeMap = new Map();
 const stationTrainsMap = new Map();
 let isDataLoading = false;
 
@@ -9,33 +11,80 @@ export async function loadRailwayDataset() {
   isDataLoading = true;
 
   try {
-    const res = await fetch('/allIndiaTrains.json');
+    const res = await fetch('/allIndiaTrainsCompact.json');
     if (res.ok) {
       allIndiaData = await res.json();
       
-      allIndiaData.trains.forEach((train) => {
-        trainsMap.set(train.number, train);
-        if (train.schedule) {
-          train.schedule.forEach((st) => {
-            if (!stationTrainsMap.has(st.code)) {
-              stationTrainsMap.set(st.code, []);
-            }
-            stationTrainsMap.get(st.code).push({
-              trainNumber: train.number,
-              trainName: train.name,
-              trainType: train.type,
-              arr: st.arr,
-              dep: st.dep,
-              day: st.day
-            });
-          });
-        }
+      // Unpack Stations
+      stationsList = allIndiaData.st.map((st) => ({
+        code: st.c,
+        name: st.n
+      }));
+
+      stationsList.forEach((st) => {
+        stationsCodeMap.set(st.code, st.name);
       });
 
-      allIndiaData.stations.forEach((st) => {
-        stationsMap.set(st.code, st.name);
+      // Unpack Trains
+      trainsList = allIndiaData.tr.map((t) => {
+        const schedule = t.sch.map((s) => {
+          const stObj = allIndiaData.st[s[0]] || { c: 'UNK', n: 'Unknown' };
+          return {
+            code: stObj.c,
+            name: stObj.n,
+            arr: s[1],
+            dep: s[2],
+            day: s[3]
+          };
+        });
+
+        const first = schedule[0] || { code: '', name: '', dep: '00:00' };
+        const last = schedule[schedule.length - 1] || { code: '', name: '', arr: '00:00' };
+
+        let typeFull = 'Express';
+        if (t.typ === 'VB') typeFull = 'Vande Bharat';
+        else if (t.typ === 'RAJ') typeFull = 'Rajdhani';
+        else if (t.typ === 'SHAT') typeFull = 'Shatabdi';
+        else if (t.typ === 'DUR') typeFull = 'Duronto';
+        else if (t.typ === 'SF') typeFull = 'Superfast Express';
+        else if (t.typ === 'LOCAL') typeFull = 'Passenger / Local';
+
+        const trainObj = {
+          number: t.num,
+          name: t.nam,
+          type: typeFull,
+          fromCode: first.code,
+          fromStation: first.name,
+          departureTime: first.dep,
+          toCode: last.code,
+          toStation: last.name,
+          arrivalTime: last.arr,
+          fromPf: (parseInt(t.num) % 9) + 1,
+          toPf: (parseInt(t.num) % 8) + 1,
+          days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          schedule: schedule
+        };
+
+        trainsMap.set(t.num, trainObj);
+
+        schedule.forEach((st) => {
+          if (!stationTrainsMap.has(st.code)) {
+            stationTrainsMap.set(st.code, []);
+          }
+          stationTrainsMap.get(st.code).push({
+            trainNumber: t.num,
+            trainName: t.nam,
+            trainType: typeFull,
+            arr: st.arr,
+            dep: st.dep,
+            day: st.day
+          });
+        });
+
+        return trainObj;
       });
-      console.log(`[Client Railway Engine] Loaded ${allIndiaData.trains.length} trains & ${allIndiaData.stations.length} stations.`);
+
+      console.log(`[Client Railway Engine] Loaded ${trainsList.length} trains & ${stationsList.length} stations.`);
     }
   } catch (e) {
     console.warn('[Client Railway Engine] Could not load static json dataset:', e.message);
@@ -47,14 +96,13 @@ export async function loadRailwayDataset() {
 // Initial async load
 loadRailwayDataset();
 
-// Helper: Resolve station code
 export function resolveStationCode(query) {
   if (!query) return null;
   const clean = query.trim().toUpperCase();
 
-  if (stationsMap.has(clean)) return clean;
+  if (stationsCodeMap.has(clean)) return clean;
 
-  for (const [code, name] of stationsMap.entries()) {
+  for (const [code, name] of stationsCodeMap.entries()) {
     if (name.toUpperCase().includes(clean)) {
       return code;
     }
@@ -62,26 +110,23 @@ export function resolveStationCode(query) {
   return clean;
 }
 
-// 1. Search Trains Between Stations or by query
 export function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
-  if (!allIndiaData || !allIndiaData.trains) return [];
+  if (!trainsList || trainsList.length === 0) return [];
 
   const fromCode = resolveStationCode(fromQuery);
   const toCode = resolveStationCode(toQuery);
   const qClean = query.trim().toUpperCase();
 
-  // Case A: Query specified (Train Number or Name)
   if (qClean) {
-    return allIndiaData.trains
+    return trainsList
       .filter((t) => t.number.includes(qClean) || t.name.toUpperCase().includes(qClean))
       .slice(0, 50);
   }
 
-  // Case B: Both From and To stations specified
   if (fromCode && toCode) {
     const matched = [];
 
-    for (const train of allIndiaData.trains) {
+    for (const train of trainsList) {
       if (!train.schedule) continue;
 
       const fromIdx = train.schedule.findIndex((s) => s.code === fromCode);
@@ -106,12 +151,12 @@ export function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = 
           toCode: toStop.code,
           toStation: toStop.name,
           arrivalTime: toStop.arr || toStop.dep,
-          fromPf: train.fromPf || 1,
-          toPf: train.toPf || 1,
+          fromPf: train.fromPf,
+          toPf: train.toPf,
           durationStr: durStr,
           distanceKm: estDistanceKm,
           intermediateCount: intermediateStops - 1,
-          days: train.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          days: train.days,
           schedule: train.schedule
         });
       }
@@ -120,12 +165,11 @@ export function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = 
     return matched;
   }
 
-  // Case C: Single station specified
   if (fromCode || toCode) {
     const targetCode = fromCode || toCode;
     const matched = [];
 
-    for (const train of allIndiaData.trains) {
+    for (const train of trainsList) {
       if (!train.schedule) continue;
       const idx = train.schedule.findIndex((s) => s.code === targetCode);
       if (idx !== -1) {
@@ -136,18 +180,16 @@ export function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = 
     return matched.slice(0, 40);
   }
 
-  // Case D: Blank search -> Top popular national trains
-  return allIndiaData.trains.slice(0, 50);
+  return trainsList.slice(0, 50);
 }
 
-// 2. Station Autocomplete Search
 export function searchStations(query = '') {
-  if (!query || !allIndiaData || !allIndiaData.stations) return [];
+  if (!query || !stationsList) return [];
 
   const qClean = query.trim().toUpperCase();
   const results = [];
 
-  for (const st of allIndiaData.stations) {
+  for (const st of stationsList) {
     if (st.code.startsWith(qClean) || st.name.toUpperCase().includes(qClean)) {
       results.push(st);
       if (results.length >= 25) break;
@@ -157,10 +199,9 @@ export function searchStations(query = '') {
   return results;
 }
 
-// 3. Live Station Board
 export function getLiveStationBoard(stationQuery) {
   const code = resolveStationCode(stationQuery) || 'NDLS';
-  const stationName = stationsMap.get(code) || stationQuery;
+  const stationName = stationsCodeMap.get(code) || stationQuery;
 
   const passing = stationTrainsMap.get(code) || [];
 
@@ -172,9 +213,8 @@ export function getLiveStationBoard(stationQuery) {
   };
 }
 
-// 4. Live Spot Train Status
 export function getLiveTrainStatus(trainNumber) {
-  const defaultTrain = (allIndiaData && allIndiaData.trains) ? allIndiaData.trains[0] : { schedule: [] };
+  const defaultTrain = trainsList[0] || { schedule: [] };
   const train = trainsMap.get(trainNumber) || defaultTrain;
 
   const totalStops = (train.schedule || []).length;

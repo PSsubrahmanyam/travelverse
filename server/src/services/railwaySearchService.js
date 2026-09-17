@@ -2,64 +2,106 @@ const path = require('path');
 const fs = require('fs');
 
 let dataset = null;
+let trainsList = [];
+let stationsList = [];
 let trainsMap = new Map();
-let stationsMap = new Map();
+let stationsCodeMap = new Map();
 let stationTrainsMap = new Map();
 
 function initDataset() {
   if (dataset) return;
 
-  const jsonPath = path.join(__dirname, '../data/allIndiaTrains.json');
-  console.log('[Railway Engine] Loading All-India Trains dataset from:', jsonPath);
+  const jsonPath = path.join(__dirname, '../data/allIndiaTrainsCompact.json');
+  console.log('[Railway Engine] Loading Compact All-India Trains dataset from:', jsonPath);
 
   if (fs.existsSync(jsonPath)) {
     const rawData = fs.readFileSync(jsonPath, 'utf8');
     dataset = JSON.parse(rawData);
 
-    // Build Maps
-    dataset.trains.forEach((train) => {
-      trainsMap.set(train.number, train);
+    // Unpack Stations
+    stationsList = dataset.st.map((st) => ({
+      code: st.c,
+      name: st.n
+    }));
 
-      // Build Station -> Trains Map
-      if (train.schedule) {
-        train.schedule.forEach((st) => {
-          if (!stationTrainsMap.has(st.code)) {
-            stationTrainsMap.set(st.code, []);
-          }
-          stationTrainsMap.get(st.code).push({
-            trainNumber: train.number,
-            trainName: train.name,
-            trainType: train.type,
-            arr: st.arr,
-            dep: st.dep,
-            day: st.day
-          });
+    stationsList.forEach((st) => {
+      stationsCodeMap.set(st.code, st.name);
+    });
+
+    // Unpack Trains
+    trainsList = dataset.tr.map((t) => {
+      const schedule = t.sch.map((s) => {
+        const stObj = dataset.st[s[0]] || { c: 'UNK', n: 'Unknown' };
+        return {
+          code: stObj.c,
+          name: stObj.n,
+          arr: s[1],
+          dep: s[2],
+          day: s[3]
+        };
+      });
+
+      const first = schedule[0] || { code: '', name: '', dep: '00:00' };
+      const last = schedule[schedule.length - 1] || { code: '', name: '', arr: '00:00' };
+
+      let typeFull = 'Express';
+      if (t.typ === 'VB') typeFull = 'Vande Bharat';
+      else if (t.typ === 'RAJ') typeFull = 'Rajdhani';
+      else if (t.typ === 'SHAT') typeFull = 'Shatabdi';
+      else if (t.typ === 'DUR') typeFull = 'Duronto';
+      else if (t.typ === 'SF') typeFull = 'Superfast Express';
+      else if (t.typ === 'LOCAL') typeFull = 'Passenger / Local';
+
+      const trainObj = {
+        number: t.num,
+        name: t.nam,
+        type: typeFull,
+        fromCode: first.code,
+        fromStation: first.name,
+        departureTime: first.dep,
+        toCode: last.code,
+        toStation: last.name,
+        arrivalTime: last.arr,
+        fromPf: (parseInt(t.num) % 9) + 1,
+        toPf: (parseInt(t.num) % 8) + 1,
+        days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        schedule: schedule
+      };
+
+      trainsMap.set(t.num, trainObj);
+
+      schedule.forEach((st) => {
+        if (!stationTrainsMap.has(st.code)) {
+          stationTrainsMap.set(st.code, []);
+        }
+        stationTrainsMap.get(st.code).push({
+          trainNumber: t.num,
+          trainName: t.nam,
+          trainType: typeFull,
+          arr: st.arr,
+          dep: st.dep,
+          day: st.day
         });
-      }
+      });
+
+      return trainObj;
     });
 
-    dataset.stations.forEach((st) => {
-      stationsMap.set(st.code, st.name);
-    });
-
-    console.log(`[Railway Engine] Successfully loaded ${dataset.trains.length} trains and ${dataset.stations.length} stations.`);
+    console.log(`[Railway Engine] Successfully loaded ${trainsList.length} trains and ${stationsList.length} stations.`);
   } else {
-    console.error('[Railway Engine Error] allIndiaTrains.json dataset not found!');
+    console.error('[Railway Engine Error] allIndiaTrainsCompact.json dataset not found!');
   }
 }
 
-// Ensure initialized
 initDataset();
 
-// Helper: Resolve Station Code from Code or Name
 function resolveStationCode(query) {
   if (!query) return null;
   const clean = query.trim().toUpperCase();
 
-  if (stationsMap.has(clean)) return clean;
+  if (stationsCodeMap.has(clean)) return clean;
 
-  // Search by station name match
-  for (const [code, name] of stationsMap.entries()) {
+  for (const [code, name] of stationsCodeMap.entries()) {
     if (name.toUpperCase().includes(clean)) {
       return code;
     }
@@ -67,28 +109,24 @@ function resolveStationCode(query) {
   return clean;
 }
 
-// 1. Search Trains Between Stations or Search Query
 function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
   initDataset();
-
-  if (!dataset || !dataset.trains) return [];
+  if (!trainsList) return [];
 
   const fromCode = resolveStationCode(fromQuery);
   const toCode = resolveStationCode(toQuery);
   const qClean = query.trim().toUpperCase();
 
-  // Case A: Query specified (Search by train number or train name)
   if (qClean) {
-    return dataset.trains
+    return trainsList
       .filter((t) => t.number.includes(qClean) || t.name.toUpperCase().includes(qClean))
       .slice(0, 50);
   }
 
-  // Case B: Both From and To stations specified
   if (fromCode && toCode) {
     const matched = [];
 
-    for (const train of dataset.trains) {
+    for (const train of trainsList) {
       if (!train.schedule) continue;
 
       const fromIdx = train.schedule.findIndex((s) => s.code === fromCode);
@@ -98,9 +136,8 @@ function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
         const fromStop = train.schedule[fromIdx];
         const toStop = train.schedule[toIdx];
 
-        // Calculate travel duration estimate
         const intermediateStops = toIdx - fromIdx;
-        const estDistanceKm = intermediateStops * 48; // avg ~48km between stops
+        const estDistanceKm = intermediateStops * 48;
         const durHours = Math.max(1, Math.round(intermediateStops * 0.9));
         const durStr = `${durHours}h ${intermediateStops * 8 % 60}m`;
 
@@ -114,12 +151,12 @@ function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
           toCode: toStop.code,
           toStation: toStop.name,
           arrivalTime: toStop.arr || toStop.dep,
-          fromPf: train.fromPf || 1,
-          toPf: train.toPf || 1,
+          fromPf: train.fromPf,
+          toPf: train.toPf,
           durationStr: durStr,
           distanceKm: estDistanceKm,
           intermediateCount: intermediateStops - 1,
-          days: train.days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+          days: train.days,
           schedule: train.schedule
         });
       }
@@ -128,12 +165,11 @@ function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
     return matched;
   }
 
-  // Case C: Single Station specified (From only or To only)
   if (fromCode || toCode) {
     const targetCode = fromCode || toCode;
     const matched = [];
 
-    for (const train of dataset.trains) {
+    for (const train of trainsList) {
       if (!train.schedule) continue;
       const idx = train.schedule.findIndex((s) => s.code === targetCode);
       if (idx !== -1) {
@@ -144,19 +180,17 @@ function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = '') {
     return matched.slice(0, 40);
   }
 
-  // Case D: Empty inputs -> Return top featured trains
-  return dataset.trains.slice(0, 50);
+  return trainsList.slice(0, 50);
 }
 
-// 2. Station Autocomplete Search
 function searchStations(query = '') {
   initDataset();
-  if (!query || !dataset) return [];
+  if (!query || !stationsList) return [];
 
   const qClean = query.trim().toUpperCase();
   const results = [];
 
-  for (const st of dataset.stations) {
+  for (const st of stationsList) {
     if (st.code.startsWith(qClean) || st.name.toUpperCase().includes(qClean)) {
       results.push(st);
       if (results.length >= 25) break;
@@ -166,11 +200,10 @@ function searchStations(query = '') {
   return results;
 }
 
-// 3. Get Live Station Board
 function getLiveStationBoard(stationQuery) {
   initDataset();
   const code = resolveStationCode(stationQuery) || 'NDLS';
-  const stationName = stationsMap.get(code) || stationQuery;
+  const stationName = stationsCodeMap.get(code) || stationQuery;
 
   const passing = stationTrainsMap.get(code) || [];
 
@@ -178,32 +211,32 @@ function getLiveStationBoard(stationQuery) {
     stationCode: code,
     stationName: stationName,
     totalPassingTrains: passing.length,
-    upcomingTrains: passing.slice(0, 15)
+    upcomingTrains: passing.slice(0, 20)
   };
 }
 
-// 4. Get Live Train Status
 function getLiveTrainStatus(trainNumber) {
   initDataset();
-  const train = trainsMap.get(trainNumber) || dataset.trains[0];
+  const defaultTrain = trainsList[0] || { schedule: [] };
+  const train = trainsMap.get(trainNumber) || defaultTrain;
 
-  const totalStops = train.schedule.length;
+  const totalStops = (train.schedule || []).length;
   const currentIdx = Math.floor(totalStops * 0.4);
-  const currentStop = train.schedule[currentIdx] || train.schedule[0];
-  const nextStop = train.schedule[currentIdx + 1] || train.schedule[totalStops - 1];
+  const currentStop = (train.schedule || [])[currentIdx] || (train.schedule || [])[0] || { name: 'Origin', code: 'START' };
+  const nextStop = (train.schedule || [])[currentIdx + 1] || (train.schedule || [])[totalStops - 1] || { name: 'Destination', code: 'END' };
 
   return {
-    trainNumber: train.number,
-    trainName: train.name,
-    trainType: train.type,
+    trainNumber: train.number || trainNumber,
+    trainName: train.name || 'Express',
+    trainType: train.type || 'Superfast',
     status: 'Running On Time',
     delayMinutes: 0,
     currentStation: currentStop.name,
     currentCode: currentStop.code,
     nextStation: nextStop.name,
     nextCode: nextStop.code,
-    platform: (parseInt(train.number) % 6) + 1,
-    schedule: train.schedule
+    platform: (parseInt(trainNumber) % 6) + 1,
+    schedule: train.schedule || []
   };
 }
 
