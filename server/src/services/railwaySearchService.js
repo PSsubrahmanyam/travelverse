@@ -286,6 +286,34 @@ function normalizeName(str) {
     .trim();
 }
 
+function getTrainRunningDays(numStr, nameStr) {
+  const nameUpper = (nameStr || '').toUpperCase();
+  const numInt = parseInt(numStr) || 0;
+  const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+  if (nameUpper.includes('WEEKLY') || nameUpper.includes('WKLY') || nameUpper.includes('1 DAY')) {
+    return [daysMap[numInt % 7]];
+  }
+  if (nameUpper.includes('BI-WEEKLY') || nameUpper.includes('BI WEEKLY') || nameUpper.includes('BIWEEKLY') || nameUpper.includes('2 DAYS')) {
+    return [daysMap[numInt % 7], daysMap[(numInt + 3) % 7]];
+  }
+  if (nameUpper.includes('TRI-WEEKLY') || nameUpper.includes('TRI WEEKLY') || nameUpper.includes('TRIWEEKLY') || nameUpper.includes('3 DAYS')) {
+    return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 4) % 7]];
+  }
+  if (nameUpper.includes('HUMSAFAR') || nameUpper.includes('SUVIDHA') || nameUpper.includes('SPL') || nameUpper.includes('SPECIAL')) {
+    if (numInt % 2 === 0) {
+      return [daysMap[numInt % 7]];
+    } else {
+      return [daysMap[numInt % 7], daysMap[(numInt + 4) % 7]];
+    }
+  }
+  if (nameUpper.includes('SAMPARK KRANTI') || nameUpper.includes('GARIB RATH') || nameUpper.includes('AC EXP')) {
+    return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 5) % 7]];
+  }
+
+  return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+}
+
 function initDataset() {
   if (dataset) return;
 
@@ -330,6 +358,8 @@ function initDataset() {
       else if (t.typ === 'SF') typeFull = 'Superfast Express';
       else if (t.typ === 'LOCAL') typeFull = 'Passenger / Local';
 
+      const runningDays = getTrainRunningDays(t.num, t.nam);
+
       const trainObj = {
         number: t.num,
         name: t.nam,
@@ -342,7 +372,7 @@ function initDataset() {
         arrivalTime: last.arr,
         fromPf: (parseInt(t.num) % 9) + 1,
         toPf: (parseInt(t.num) % 8) + 1,
-        days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        days: runningDays,
         schedule: schedule
       };
 
