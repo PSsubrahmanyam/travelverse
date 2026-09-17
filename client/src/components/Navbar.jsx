@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Compass, MapPin, Calculator, Heart, Headphones, Menu, X, User, LogOut, Edit3 } from 'lucide-react';
+import { Compass, MapPin, Calculator, Train, Heart, Headphones, Menu, X, User, LogOut, Edit3 } from 'lucide-react';
 
 export default function Navbar({ 
   activeTab, 
@@ -17,6 +17,7 @@ export default function Navbar({
     { id: 'places', label: 'Destinations', icon: Compass },
     { id: 'map', label: 'Interactive Map', icon: MapPin },
     { id: 'budget', label: 'Budget Estimator', icon: Calculator },
+    { id: 'trains', label: 'Where is My Train', icon: Train },
     { id: 'support', label: 'Support', icon: Headphones },
   ];
 

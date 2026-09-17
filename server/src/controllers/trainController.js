@@ -1,27 +1,16 @@
 const {
-  POPULAR_STATIONS,
-  POPULAR_TRAINS,
   findTrainsBetweenStations,
-  getLiveTrainStatus,
+  searchStations,
   getLiveStationBoard,
-} = require('../data/railwaysData');
+  getLiveTrainStatus,
+} = require('../services/railwaySearchService');
 
-// @desc    Get all Indian Railway stations
+// @desc    Get Indian Railway stations autocomplete
 // @route   GET /api/trains/stations
 const getStations = async (req, res) => {
   try {
     const { search } = req.query;
-    let stations = POPULAR_STATIONS;
-
-    if (search) {
-      const q = search.toLowerCase().trim();
-      stations = stations.filter(
-        (s) =>
-          s.name.toLowerCase().includes(q) ||
-          s.code.toLowerCase().includes(q) ||
-          s.city.toLowerCase().includes(q)
-      );
-    }
+    const stations = searchStations(search || '');
 
     res.status(200).json({
       success: true,
@@ -33,25 +22,18 @@ const getStations = async (req, res) => {
   }
 };
 
-// @desc    Search trains between two stations
+// @desc    Search trains between stations or by train number/name
 // @route   GET /api/trains/between-stations
 const getTrainsBetweenStations = async (req, res) => {
   try {
-    const { from, to } = req.query;
-    if (!from || !to) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide both "from" and "to" station codes or names.',
-      });
-    }
-
-    const trains = findTrainsBetweenStations(from, to);
+    const { from, to, query } = req.query;
+    const trains = findTrainsBetweenStations(from || '', to || '', query || '');
 
     res.status(200).json({
       success: true,
       count: trains.length,
-      from,
-      to,
+      from: from || '',
+      to: to || '',
       data: trains,
     });
   } catch (error) {
@@ -91,26 +73,9 @@ const getStationBoard = async (req, res) => {
   }
 };
 
-// @desc    Get PNR Status Simulation
-// @route   GET /api/trains/pnr/:pnrNumber
-const checkPNR = async (req, res) => {
-  try {
-    const { pnrNumber } = req.params;
-    const pnrData = getPNRStatus(pnrNumber);
-
-    res.status(200).json({
-      success: true,
-      data: pnrData,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
 module.exports = {
   getStations,
   getTrainsBetweenStations,
   getLiveStatus,
   getStationBoard,
-  checkPNR,
 };

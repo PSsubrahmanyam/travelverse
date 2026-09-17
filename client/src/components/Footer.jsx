@@ -62,6 +62,17 @@ export default function Footer() {
                 <button
                   onClick={(e) => {
                     e.preventDefault();
+                    document.getElementById('trains')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="hover:text-white transition-colors cursor-pointer text-left text-amber-400 font-semibold"
+                >
+                  Where is My Train
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
                     document.getElementById('support')?.scrollIntoView({ behavior: 'smooth' });
                   }}
                   className="hover:text-white transition-colors cursor-pointer text-left"

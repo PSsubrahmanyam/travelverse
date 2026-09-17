@@ -1,501 +1,434 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  POPULAR_STATIONS,
-  POPULAR_TRAINS,
+  loadRailwayDataset,
   findTrainsBetweenStations,
-  getLiveTrainStatus,
+  searchStations,
   getLiveStationBoard,
-  getCoachComposition,
+  getLiveTrainStatus,
 } from '../data/railwaysData';
 import {
   Train,
   MapPin,
-  ArrowRightLeft,
-  Calendar,
   Clock,
+  ArrowRightLeft,
   Search,
-  CheckCircle2,
-  AlertCircle,
-  ChevronRight,
-  ShieldCheck,
-  Ticket,
-  Users,
-  Compass,
-  Zap,
-  Info,
+  Filter,
   Layers,
-  Bell,
-  BellRing,
-  Navigation,
-  Gauge,
+  Sparkles,
+  ChevronRight,
+  Info,
   X,
-  Wifi,
-  Radio,
+  ListOrdered,
+  Calendar,
+  ShieldCheck,
+  Building,
+  Navigation
 } from 'lucide-react';
 
 export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
-  const [activeSubTab, setActiveSubTab] = useState('between'); // 'between' | 'live' | 'station' | 'pnr'
+  const [activeTab, setActiveTab] = useState('between'); // 'between' | 'station' | 'coach'
+  const [refreshCount, setRefreshCount] = useState(0);
+
+  useEffect(() => {
+    loadRailwayDataset().then(() => {
+      setRefreshCount((c) => c + 1);
+    });
+  }, []);
 
   // Tab 1 State: Trains Between Stations
-  const [fromCode, setFromCode] = useState('');
-  const [toCode, setToCode] = useState('');
-  const [journeyDate, setJourneyDate] = useState('today');
-  const [selectedClass, setSelectedClass] = useState('ALL');
-  const [selectedQuota, setSelectedQuota] = useState('GN');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState('ALL'); // 'ALL' | 'EARLY' | 'MORNING' | 'AFTERNOON' | 'NIGHT'
-  const [selectedType, setSelectedType] = useState('ALL'); // 'ALL' | 'VANDE' | 'RAJDHANI' | 'SUPERFAST'
-  const [sortBy, setSortBy] = useState('DEP_ASC'); // 'DEP_ASC' | 'DEP_DESC' | 'DURATION_ASC' | 'ARR_ASC'
+  const [inputFrom, setInputFrom] = useState(initialFrom);
+  const [inputTo, setInputTo] = useState(initialTo);
+  const [trainQuery, setTrainQuery] = useState('');
+  
+  const [queryFrom, setQueryFrom] = useState(initialFrom);
+  const [queryTo, setQueryTo] = useState(initialTo);
+  const [queryTrain, setQueryTrain] = useState('');
 
-  // Autocomplete search inputs
-  const [fromSearch, setFromSearch] = useState('');
-  const [toSearch, setToSearch] = useState('');
-  const [showFromDropdown, setShowFromDropdown] = useState(false);
-  const [showToDropdown, setShowToDropdown] = useState(false);
+  // Autocomplete dropdown states
+  const [fromSuggestions, setFromSuggestions] = useState([]);
+  const [toSuggestions, setToSuggestions] = useState([]);
 
-  // Expanded Train Card Seat Grid Drawer state
-  const [expandedSeatTrain, setExpandedSeatTrain] = useState(null);
+  // Sorting & Filtering
+  const [sortBy, setSortBy] = useState('departure'); // 'departure' | 'duration' | 'name'
+  const [filterType, setFilterType] = useState('ALL'); // 'ALL' | 'Vande Bharat' | 'Rajdhani' | 'Superfast'
 
-  // Tab 2 State: Live Spotting
-  const [liveTrainQuery, setLiveTrainQuery] = useState('12727');
-  const [liveTrainData, setLiveTrainData] = useState(() => getLiveTrainStatus('12727'));
-  const [isInsideTrainMode, setIsInsideTrainMode] = useState(true);
-
-  // Tab 3 State: Live Station Board
-  const [stationQuery, setStationQuery] = useState('');
-  const [stationBoardData, setStationBoardData] = useState(null);
-
-
-
-  // Coach Composition Modal State
+  // Modal / Drawers State
+  const [selectedRouteTrain, setSelectedRouteTrain] = useState(null);
   const [coachModalTrain, setCoachModalTrain] = useState(null);
 
-  // Destination Arrival Alarm State
-  const [alarmActive, setAlarmActive] = useState(false);
+  // Tab 2 State: Live Station Board
+  const [boardStationInput, setBoardStationInput] = useState('NDLS');
+  const [boardStationQuery, setBoardStationQuery] = useState('NDLS');
+  const [boardSuggestions, setBoardSuggestions] = useState([]);
 
-  // Station Autocomplete Filters
-  const filteredFromStations = useMemo(() => {
-    if (!fromSearch.trim()) return POPULAR_STATIONS.slice(0, 8);
-    const q = fromSearch.toLowerCase().trim();
-    return POPULAR_STATIONS.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.code.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q)
-    ).slice(0, 10);
-  }, [fromSearch]);
+  // Handlers for Autocomplete
+  const handleFromChange = (val) => {
+    setInputFrom(val);
+    if (val.trim().length >= 1) {
+      setFromSuggestions(searchStations(val));
+    } else {
+      setFromSuggestions([]);
+    }
+  };
 
-  const filteredToStations = useMemo(() => {
-    if (!toSearch.trim()) return POPULAR_STATIONS.slice(0, 8);
-    const q = toSearch.toLowerCase().trim();
-    return POPULAR_STATIONS.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.code.toLowerCase().includes(q) ||
-        s.city.toLowerCase().includes(q)
-    ).slice(0, 10);
-  }, [toSearch]);
+  const handleToChange = (val) => {
+    setInputTo(val);
+    if (val.trim().length >= 1) {
+      setToSuggestions(searchStations(val));
+    } else {
+      setToSuggestions([]);
+    }
+  };
 
-  // Swap From & To Stations
   const handleSwapStations = () => {
-    const tempCode = fromCode;
-    const tempSearch = fromSearch;
-    setFromCode(toCode);
-    setFromSearch(toSearch);
-    setToCode(tempCode);
-    setToSearch(tempSearch);
+    const tempIn = inputFrom;
+    setInputFrom(inputTo);
+    setInputTo(tempIn);
+
+    const tempQ = queryFrom;
+    setQueryFrom(queryTo);
+    setQueryTo(tempQ);
   };
 
-  // Find Trains Between Stations (Authentic Schedule Only with Advanced Sorting & Filters)
+  const handleSearchSubmit = (e) => {
+    if (e) e.preventDefault();
+    setQueryFrom(inputFrom);
+    setQueryTo(inputTo);
+    setQueryTrain(trainQuery);
+    setFromSuggestions([]);
+    setToSuggestions([]);
+  };
+
+  const handleClearInputs = () => {
+    setInputFrom('');
+    setInputTo('');
+    setTrainQuery('');
+    setQueryFrom('');
+    setQueryTo('');
+    setQueryTrain('');
+    setFromSuggestions([]);
+    setToSuggestions([]);
+  };
+
+  // Find trains list
   const searchResults = useMemo(() => {
-    const queryFrom = fromCode || fromSearch;
-    const queryTo = toCode || toSearch;
-    let list = findTrainsBetweenStations(queryFrom, queryTo);
+    let list = findTrainsBetweenStations(queryFrom, queryTo, queryTrain);
 
-    if (selectedClass !== 'ALL') {
-      list = list.filter((t) => t.classes.includes(selectedClass));
+    // Apply Filter Type
+    if (filterType !== 'ALL') {
+      list = list.filter((t) => (t.type || '').toUpperCase().includes(filterType.toUpperCase()));
     }
 
-    if (selectedType !== 'ALL') {
-      if (selectedType === 'VANDE') {
-        list = list.filter((t) => t.name.includes('Vande Bharat') || t.name.includes('Tejas'));
-      } else if (selectedType === 'RAJDHANI') {
-        list = list.filter((t) => t.type.includes('Rajdhani') || t.type.includes('Shatabdi') || t.type.includes('Duronto'));
-      } else if (selectedType === 'SUPERFAST') {
-        list = list.filter((t) => t.type.includes('Superfast') || t.type.includes('Express'));
-      }
-    }
-
-    if (selectedTimeSlot !== 'ALL') {
-      list = list.filter((t) => {
-        const [h] = (t.departureTime || '00:00').split(':').map(Number);
-        if (selectedTimeSlot === 'EARLY') return h >= 0 && h < 6;
-        if (selectedTimeSlot === 'MORNING') return h >= 6 && h < 12;
-        if (selectedTimeSlot === 'AFTERNOON') return h >= 12 && h < 18;
-        if (selectedTimeSlot === 'NIGHT') return h >= 18 && h <= 23;
-        return true;
-      });
-    }
-
-    const parseMins = (timeStr) => {
-      if (!timeStr || timeStr === 'Source' || timeStr === 'Destination') return 0;
-      const [h, m] = timeStr.split(':').map(Number);
-      return (h || 0) * 60 + (m || 0);
-    };
-
-    const parseDur = (durStr) => {
-      if (!durStr) return 0;
-      const hMatch = durStr.match(/(\d+)h/);
-      const mMatch = durStr.match(/(\d+)m/);
-      const hrs = hMatch ? parseInt(hMatch[1]) : 0;
-      const mins = mMatch ? parseInt(mMatch[1]) : 0;
-      return hrs * 60 + mins;
-    };
-
+    // Apply Sorting
     return [...list].sort((a, b) => {
-      const depA = parseMins(a.departureTime);
-      const depB = parseMins(b.departureTime);
-      const arrA = parseMins(a.arrivalTime);
-      const arrB = parseMins(b.arrivalTime);
-      const durA = parseDur(a.durationStr);
-      const durB = parseDur(b.durationStr);
-
-      if (sortBy === 'DEP_DESC') return depB - depA;
-      if (sortBy === 'DURATION_ASC') return durA - durB;
-      if (sortBy === 'ARR_ASC') return arrA - arrB;
-      return depA - depB; // Default DEP_ASC
+      if (sortBy === 'departure') {
+        return (a.departureTime || '00:00').localeCompare(b.departureTime || '00:00');
+      }
+      if (sortBy === 'duration') {
+        return (a.intermediateCount || 0) - (b.intermediateCount || 0);
+      }
+      if (sortBy === 'name') {
+        return (a.name || '').localeCompare(b.name || '');
+      }
+      return 0;
     });
-  }, [fromCode, toCode, selectedClass, selectedType, selectedTimeSlot, sortBy]);
+  }, [queryFrom, queryTo, queryTrain, filterType, sortBy]);
 
-  // Handle Live Spotting Search
-  const handleSearchLiveTrain = (e) => {
-    if (e) e.preventDefault();
-    if (!liveTrainQuery.trim()) return;
-    const res = getLiveTrainStatus(liveTrainQuery);
-    setLiveTrainData(res);
-  };
-
-  // Handle Station Board Search
-  const handleSearchStationBoard = (e) => {
-    if (e) e.preventDefault();
-    if (!stationQuery.trim()) return;
-    const res = getLiveStationBoard(stationQuery);
-    setStationBoardData(res);
-  };
-
-
+  // Station Board Data
+  const stationBoardData = useMemo(() => {
+    return getLiveStationBoard(boardStationQuery);
+  }, [boardStationQuery]);
 
   return (
-    <section id="trains" className="bg-slate-900 text-white py-12 border-t border-slate-800 relative min-h-screen">
+    <section id="trains" className="bg-slate-900 text-white py-16 border-t border-slate-800 relative min-h-screen">
       
-      {/* Dynamic Background Glow */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Dynamic Background Blur */}
+      <div className="absolute top-0 right-1/3 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+      <div className="absolute bottom-0 left-1/3 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
-        {/* Header Title */}
-        <div className="text-center max-w-3xl mx-auto mb-8">
-          <div className="inline-flex items-center space-x-2 bg-amber-500/20 border border-amber-500/40 px-4 py-1.5 rounded-full text-xs font-bold text-amber-400 mb-3 backdrop-blur-md">
+        {/* Section Header */}
+        <div className="text-center mb-10">
+          <div className="inline-flex items-center space-x-2 text-amber-400 bg-amber-500/10 border border-amber-500/20 px-4 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase mb-3">
             <Train className="w-4 h-4 text-amber-400 animate-bounce" />
-            <span>Where Is My Train • Real-Time IRCTC Portal</span>
+            <span>Where Is My Train • All-India IRCTC Engine (5,200+ Trains)</span>
           </div>
-          <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
             Where Is My <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-sky-400 to-blue-400">Train</span>
           </h2>
-          <p className="text-slate-400 text-sm mt-2">
-            Browse all authentic Indian Railways train schedules, inspect coach layouts & live station boards without any forced station selection.
+          <p className="text-slate-400 mt-2 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed">
+            Search 5,207 authentic Indian Railways train schedules & 8,538 stations dynamically. Inspect full route schedules, arrival/departure boards, and coach layout maps.
           </p>
         </div>
 
-        {/* Navigation Tabs Bar */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8 max-w-5xl mx-auto bg-slate-950/80 p-2 rounded-2xl border border-slate-800 shadow-xl backdrop-blur-md">
-          <button
-            onClick={() => setActiveSubTab('between')}
-            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeSubTab === 'between'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <ArrowRightLeft className="w-4 h-4" />
-            <span>Trains Between Stations</span>
-          </button>
+        {/* Sub-Tabs Switcher */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-slate-800/90 border border-slate-700/80 p-1.5 rounded-2xl flex flex-wrap gap-1 shadow-xl backdrop-blur-md">
+            <button
+              onClick={() => setActiveTab('between')}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'between'
+                  ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <Train className="w-4 h-4" />
+              <span>Trains Between Stations & Search</span>
+            </button>
 
-          <button
-            onClick={() => setActiveSubTab('station')}
-            className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all ${
-              activeSubTab === 'station'
-                ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Live Station Board</span>
-          </button>
+            <button
+              onClick={() => setActiveTab('station')}
+              className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'station'
+                  ? 'bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20'
+                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+              }`}
+            >
+              <Building className="w-4 h-4" />
+              <span>Station Live Board</span>
+            </button>
+          </div>
         </div>
 
-        {/* ========================================================================= */}
-        {/* TAB 1: TRAINS BETWEEN STATIONS                                             */}
-        {/* ========================================================================= */}
-        {activeSubTab === 'between' && (
-          <div className="space-y-8 animate-fadeIn">
+        {/* TAB 1: TRAINS BETWEEN STATIONS & SEARCH */}
+        {activeTab === 'between' && (
+          <div className="space-y-8">
             
-            {/* Search Box Card */}
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl max-w-5xl mx-auto relative z-20">
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+            {/* Search Box Form */}
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md max-w-4xl mx-auto">
+              <form onSubmit={handleSearchSubmit} className="space-y-4">
                 
-                {/* Source Station Picker */}
-                <div className="lg:col-span-5 relative">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    From Station
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={fromSearch}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setFromSearch(val);
-                        if (!val.trim()) setFromCode('');
-                        setShowFromDropdown(true);
-                      }}
-                      onFocus={() => setShowFromDropdown(true)}
-                      placeholder="Type station name/code (or leave blank for All)..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-amber-500 transition-all pr-8"
-                    />
-                    <MapPin className="w-4 h-4 text-amber-400 absolute right-3 top-3.5" />
-                  </div>
-
-                  {/* From Dropdown */}
-                  {showFromDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800">
-                      {filteredFromStations.map((st) => (
-                        <div
-                          key={st.code}
-                          onClick={() => {
-                            setFromCode(st.code);
-                            setFromSearch(`${st.name} (${st.code})`);
-                            setShowFromDropdown(false);
-                          }}
-                          className="p-3 hover:bg-slate-800 cursor-pointer flex justify-between items-center transition-colors"
-                        >
-                          <div>
-                            <span className="font-bold text-white text-sm block">{st.name}</span>
-                            <span className="text-[11px] text-slate-400">{st.city}, {st.state}</span>
-                          </div>
-                          <span className="bg-amber-950 text-amber-400 font-mono text-xs font-bold px-2 py-0.5 rounded border border-amber-800">
-                            {st.code}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Swap Button */}
-                <div className="lg:col-span-2 flex justify-center py-2 lg:py-0">
-                  <button
-                    onClick={handleSwapStations}
-                    title="Swap Source and Destination"
-                    className="p-3 bg-slate-900 border border-slate-800 hover:border-amber-500 text-amber-400 hover:text-white rounded-full shadow-md transition-all transform hover:rotate-180 cursor-pointer"
-                  >
-                    <ArrowRightLeft className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {/* Destination Station Picker */}
-                <div className="lg:col-span-5 relative">
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                    To Station
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={toSearch}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setToSearch(val);
-                        if (!val.trim()) setToCode('');
-                        setShowToDropdown(true);
-                      }}
-                      onFocus={() => setShowToDropdown(true)}
-                      placeholder="Type station name/code (or leave blank for All)..."
-                      className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3 text-white text-sm font-semibold focus:outline-none focus:border-amber-500 transition-all pr-8"
-                    />
-                    <MapPin className="w-4 h-4 text-sky-400 absolute right-3 top-3.5" />
-                  </div>
-
-                  {/* To Dropdown */}
-                  {showToDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto divide-y divide-slate-800">
-                      {filteredToStations.map((st) => (
-                        <div
-                          key={st.code}
-                          onClick={() => {
-                            setToCode(st.code);
-                            setToSearch(`${st.name} (${st.code})`);
-                            setShowToDropdown(false);
-                          }}
-                          className="p-3 hover:bg-slate-800 cursor-pointer flex justify-between items-center transition-colors"
-                        >
-                          <div>
-                            <span className="font-bold text-white text-sm block">{st.name}</span>
-                            <span className="text-[11px] text-slate-400">{st.city}, {st.state}</span>
-                          </div>
-                          <span className="bg-sky-950 text-sky-400 font-mono text-xs font-bold px-2 py-0.5 rounded border border-sky-800">
-                            {st.code}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-              </div>
-
-              {/* Filters Strip */}
-              <div className="mt-6 pt-6 border-t border-slate-800">
-                
-                {/* Additional Filters: Departure Time Slot & Sort By */}
-                <div className="flex flex-wrap items-center justify-between gap-4 text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
                   
-                  {/* Time Slots */}
-                  <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
-                    <span className="text-slate-400 font-medium mr-1 flex items-center">
-                      <Clock className="w-3.5 h-3.5 mr-1 text-amber-400" /> Dep Time:
-                    </span>
-                    {[
-                      { code: 'ALL', label: 'All 24 Hours' },
-                      { code: 'EARLY', label: '00:00 - 06:00 (Early)' },
-                      { code: 'MORNING', label: '06:00 - 12:00 (Morning)' },
-                      { code: 'AFTERNOON', label: '12:00 - 18:00 (Afternoon)' },
-                      { code: 'NIGHT', label: '18:00 - 24:00 (Night)' },
-                    ].map((slot) => (
-                      <button
-                        key={slot.code}
-                        onClick={() => setSelectedTimeSlot(slot.code)}
-                        className={`px-2.5 py-1 rounded-lg font-medium transition-all text-[11px] cursor-pointer ${
-                          selectedTimeSlot === slot.code
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold'
-                            : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
-                        }`}
-                      >
-                        {slot.label}
-                      </button>
-                    ))}
+                  {/* From Station Input */}
+                  <div className="md:col-span-5 relative">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      From Station (8,500+ Stations)
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        value={inputFrom}
+                        onChange={(e) => handleFromChange(e.target.value)}
+                        placeholder="Search Station (e.g. VSKP, NDLS, HYB, SBC)..."
+                        className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      />
+                    </div>
+
+                    {/* From Autocomplete Dropdown */}
+                    {fromSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto">
+                        {fromSuggestions.map((st) => (
+                          <div
+                            key={st.code}
+                            onClick={() => {
+                              setInputFrom(`${st.name} (${st.code})`);
+                              setFromSuggestions([]);
+                            }}
+                            className="px-4 py-2.5 hover:bg-slate-700 cursor-pointer flex justify-between items-center text-xs border-b border-slate-700/50"
+                          >
+                            <span className="font-bold text-white">{st.name}</span>
+                            <span className="font-mono font-extrabold text-amber-400 bg-slate-900 px-2 py-0.5 rounded">{st.code}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Sort By Dropdown */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-slate-400 font-medium">Sort By:</span>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="bg-slate-900 border border-slate-800 text-amber-400 text-xs font-bold px-3 py-1 rounded-xl focus:outline-none focus:border-amber-500 cursor-pointer"
+                  {/* Swap Button */}
+                  <div className="md:col-span-2 flex justify-center pt-2 md:pt-4">
+                    <button
+                      type="button"
+                      onClick={handleSwapStations}
+                      className="p-2.5 bg-slate-700/80 hover:bg-amber-500 hover:text-slate-950 text-slate-300 rounded-xl transition-all shadow-md active:scale-90 cursor-pointer"
+                      title="Swap From & To Stations"
                     >
-                      <option value="DEP_ASC">Departure (00:00 ➔ 23:59 Earliest)</option>
-                      <option value="DEP_DESC">Departure (23:59 ➔ 00:00 Latest)</option>
-                      <option value="DURATION_ASC">Duration (Fastest First)</option>
-                      <option value="ARR_ASC">Arrival Time (Earliest First)</option>
-                    </select>
+                      <ArrowRightLeft className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* To Station Input */}
+                  <div className="md:col-span-5 relative">
+                    <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                      To Station (8,500+ Stations)
+                    </label>
+                    <div className="relative">
+                      <MapPin className="w-4 h-4 text-sky-400 absolute left-3.5 top-3.5" />
+                      <input
+                        type="text"
+                        value={inputTo}
+                        onChange={(e) => handleToChange(e.target.value)}
+                        placeholder="Search Station (e.g. RJY, BZA, HWH, MAS)..."
+                        className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                      />
+                    </div>
+
+                    {/* To Autocomplete Dropdown */}
+                    {toSuggestions.length > 0 && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto">
+                        {toSuggestions.map((st) => (
+                          <div
+                            key={st.code}
+                            onClick={() => {
+                              setInputTo(`${st.name} (${st.code})`);
+                              setToSuggestions([]);
+                            }}
+                            className="px-4 py-2.5 hover:bg-slate-700 cursor-pointer flex justify-between items-center text-xs border-b border-slate-700/50"
+                          >
+                            <span className="font-bold text-white">{st.name}</span>
+                            <span className="font-mono font-extrabold text-sky-400 bg-slate-900 px-2 py-0.5 rounded">{st.code}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                 </div>
 
-              </div>
+                {/* Direct Train Search Bar */}
+                <div className="pt-2 flex flex-col sm:flex-row gap-3 items-center">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                    <input
+                      type="text"
+                      value={trainQuery}
+                      onChange={(e) => setTrainQuery(e.target.value)}
+                      placeholder="Or search by Train Number / Name (e.g. 12727, Godavari, Vande Bharat)..."
+                      className="w-full bg-slate-900/90 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-xs font-semibold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  </div>
 
-              {/* Popular Authentic Routes Quick Chips */}
-              <div className="mt-4 pt-3 flex items-center space-x-2 text-xs overflow-x-auto">
-                <span className="text-slate-500 font-bold uppercase tracking-wider text-[10px] flex-shrink-0">Popular Routes:</span>
-                <button
-                  onClick={() => {
-                    setFromCode('');
-                    setFromSearch('');
-                    setToCode('');
-                    setToSearch('');
-                  }}
-                  className="bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 px-3 py-1 rounded-full border border-amber-500/40 flex-shrink-0 font-bold transition-colors cursor-pointer"
-                >
-                  ✨ Show All National Trains
-                </button>
-                {[
-                  { from: 'VSKP', fromName: 'Visakhapatnam (VSKP)', to: 'RJY', toName: 'Rajahmundry (RJY)' },
-                  { from: 'VSKP', fromName: 'Visakhapatnam (VSKP)', to: 'SC', toName: 'Secunderabad (SC)' },
-                  { from: 'NDLS', fromName: 'New Delhi (NDLS)', to: 'AGC', toName: 'Agra Cantt (AGC)' },
-                  { from: 'HWH', fromName: 'Howrah (HWH)', to: 'MAS', toName: 'Chennai Central (MAS)' },
-                  { from: 'MMCT', fromName: 'Mumbai Central (MMCT)', to: 'NDLS', toName: 'New Delhi (NDLS)' }
-                ].map((chip, idx) => (
+                  <div className="flex space-x-2 w-full sm:w-auto">
+                    <button
+                      type="submit"
+                      className="flex-1 sm:flex-initial bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-bold px-6 py-2.5 rounded-xl transition-all shadow-lg text-xs flex items-center justify-center space-x-1.5 active:scale-95 cursor-pointer"
+                    >
+                      <Search className="w-4 h-4" />
+                      <span>Search Trains</span>
+                    </button>
+
+                    {(inputFrom || inputTo || trainQuery || queryFrom || queryTo || queryTrain) && (
+                      <button
+                        type="button"
+                        onClick={handleClearInputs}
+                        className="bg-slate-700 hover:bg-slate-600 text-slate-300 font-bold px-4 py-2.5 rounded-xl transition-all text-xs active:scale-95 cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </form>
+            </div>
+
+            {/* Filter & Sort Strip */}
+            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-800/40 p-4 rounded-2xl border border-slate-700/50">
+              
+              {/* Category Filter Pills */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-slate-400 font-bold mr-1 flex items-center">
+                  <Filter className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                  Type:
+                </span>
+                {['ALL', 'Vande Bharat', 'Rajdhani', 'Superfast'].map((cat) => (
                   <button
-                    key={idx}
-                    onClick={() => {
-                      setFromCode(chip.from);
-                      setFromSearch(chip.fromName);
-                      setToCode(chip.to);
-                      setToSearch(chip.toName);
-                    }}
-                    className="bg-slate-900 hover:bg-slate-800 text-amber-400 px-3 py-1 rounded-full border border-slate-800 flex-shrink-0 font-medium transition-colors"
+                    key={cat}
+                    onClick={() => setFilterType(cat)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      filterType === cat
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                    }`}
                   >
-                    {chip.from} ➔ {chip.to}
+                    {cat}
                   </button>
                 ))}
+              </div>
+
+              {/* Sorting Switcher */}
+              <div className="flex items-center space-x-2 text-xs">
+                <span className="text-slate-400 font-bold flex items-center">
+                  <ListOrdered className="w-3.5 h-3.5 mr-1 text-sky-400" />
+                  Sort By:
+                </span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="bg-slate-800 text-white font-bold px-3 py-1 rounded-lg border border-slate-700 focus:outline-none cursor-pointer"
+                >
+                  <option value="departure">Departure Time</option>
+                  <option value="duration">Stop Count / Duration</option>
+                  <option value="name">Train Name</option>
+                </select>
               </div>
 
             </div>
 
             {/* Train Results List */}
-            <div className="max-w-5xl mx-auto space-y-4">
+            <div className="max-w-4xl mx-auto space-y-4">
               
-              <div className="flex items-center justify-between px-2">
-                <h3 className="text-lg font-bold text-white flex items-center">
-                  <Train className="w-5 h-5 text-amber-400 mr-2" />
-                  Authentic IRCTC Trains ({searchResults.length} found)
+              <div className="flex justify-between items-center px-1">
+                <h3 className="text-sm font-bold text-slate-300 flex items-center">
+                  <Train className="w-4 h-4 text-amber-400 mr-2" />
+                  <span>Matching All-India Trains ({searchResults.length} found)</span>
                 </h3>
-                <span className="text-xs text-slate-400">
-                  {fromCode} to {toCode}
-                </span>
+                {queryFrom && queryTo && (
+                  <span className="text-xs font-semibold text-amber-400 bg-amber-500/10 px-3 py-0.5 rounded-full border border-amber-500/20">
+                    Route: {queryFrom} ➔ {queryTo}
+                  </span>
+                )}
               </div>
 
               {searchResults.length === 0 ? (
-                <div className="bg-slate-950 border border-slate-800 p-8 rounded-3xl text-center space-y-3">
-                  <AlertCircle className="w-10 h-10 text-amber-400 mx-auto" />
-                  <h4 className="font-bold text-white">No Direct Train Found Between Selected Stations</h4>
-                  <p className="text-xs text-slate-400">
-                    Try selecting popular station pairs like <strong>VSKP to RJY</strong>, <strong>VSKP to SC</strong>, <strong>HWH to MAS</strong>, or <strong>NDLS to AGC</strong>.
+                <div className="text-center py-12 bg-slate-800/40 rounded-3xl border border-slate-700/50 p-6">
+                  <Train className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                  <h4 className="font-bold text-white text-base">No Matching Trains Found</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                    Try searching for major junction codes (e.g. VSKP, NDLS, SBC, HYB, HWH, MAS) or clearing input fields to view all trains.
                   </p>
+                  <button
+                    onClick={handleClearInputs}
+                    className="mt-4 bg-amber-500 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs"
+                  >
+                    ✨ Show All National Trains
+                  </button>
                 </div>
               ) : (
                 searchResults.map((train) => (
                   <div
                     key={train.number}
-                    className="bg-slate-950 border border-slate-800 hover:border-amber-500/50 rounded-3xl p-6 transition-all duration-300 shadow-xl group space-y-4"
+                    className="bg-slate-800/90 border border-slate-700/80 hover:border-amber-500/50 rounded-2xl p-5 sm:p-6 shadow-xl transition-all"
                   >
                     
                     {/* Header: Train Number, Name & Type */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-4">
-                      <div>
-                        <div className="flex items-center space-x-2">
-                          <span className="bg-amber-500 text-slate-950 font-mono font-black text-xs px-2.5 py-1 rounded-lg">
-                            {train.number}
-                          </span>
-                          <h4 className="font-extrabold text-white text-base group-hover:text-amber-400 transition-colors">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 border-b border-slate-700/60 gap-2">
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-amber-500 text-slate-950 font-mono text-xs font-black px-2.5 py-1 rounded-lg shadow-md">
+                          #{train.number}
+                        </span>
+                        <div>
+                          <h4 className="font-extrabold text-white text-base leading-tight">
                             {train.name}
                           </h4>
+                          <span className="text-xs text-sky-400 font-semibold block mt-0.5">
+                            Type: {train.type}
+                          </span>
                         </div>
-                        <span className="text-[11px] text-slate-400 mt-1 block">
-                          Speed: <strong className="text-slate-300">{train.speed}</strong> • Type: <strong className="text-sky-400">{train.type}</strong>
-                        </span>
                       </div>
 
-                      {/* Running Days */}
-                      <div className="flex items-center space-x-1">
+                      {/* Operational Days Badges */}
+                      <div className="flex items-center space-x-1 text-[10px] font-bold">
                         {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
-                          const isRunning = train.days.includes(day);
+                          const isRunning = (train.days || []).includes(day);
                           return (
                             <span
                               key={day}
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                              className={`px-1.5 py-0.5 rounded ${
                                 isRunning
-                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                   : 'bg-slate-900 text-slate-600'
                               }`}
                             >
@@ -506,44 +439,77 @@ export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
                       </div>
                     </div>
 
-                    {/* Route Timings Bar */}
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 items-center bg-slate-900/60 p-4 rounded-2xl border border-slate-800/80">
+                    {/* Route Schedule Strip */}
+                    <div className="grid grid-cols-12 gap-2 items-center py-5">
                       
-                      {/* From Departure */}
-                      <div className="sm:col-span-4">
-                        <span className="text-xl font-black text-white font-mono">{train.departureTime}</span>
-                        <span className="text-xs font-bold text-amber-400 block">{train.fromStation} ({train.fromCode})</span>
-                        <span className="text-[10px] text-slate-400">Platform #{train.fromPf}</span>
+                      {/* Departure */}
+                      <div className="col-span-4 text-left">
+                        <span className="text-2xl font-black text-white font-mono leading-none block">
+                          {train.departureTime}
+                        </span>
+                        <span className="text-xs font-bold text-amber-400 block mt-1 truncate">
+                          {train.fromStation} ({train.fromCode})
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Platform #{train.fromPf}
+                        </span>
                       </div>
 
-                      {/* Duration Line */}
-                      <div className="sm:col-span-4 text-center space-y-1">
-                        <span className="text-xs font-bold text-slate-400">{train.durationStr}</span>
-                        <div className="relative flex items-center justify-center">
-                          <div className="h-0.5 w-full bg-slate-800" />
-                          <Train className="w-4 h-4 text-amber-400 absolute bg-slate-900 px-0.5" />
+                      {/* Distance & Duration Line */}
+                      <div className="col-span-4 text-center">
+                        <span className="text-xs font-bold text-slate-400 block">
+                          {train.durationStr || 'Direct Route'}
+                        </span>
+                        <div className="relative flex items-center justify-center my-1">
+                          <div className="h-0.5 bg-slate-700 w-full" />
+                          <Train className="w-4 h-4 text-amber-400 absolute bg-slate-800 px-0.5" />
                         </div>
-                        <span className="text-[10px] text-slate-500 block">{train.distanceKm} km</span>
+                        <span className="text-[10px] text-slate-500 block font-mono">
+                          {train.schedule ? `${train.schedule.length} Total Stops` : 'Authentic IRCTC'}
+                        </span>
                       </div>
 
-                      {/* To Arrival */}
-                      <div className="sm:col-span-4 text-right">
-                        <span className="text-xl font-black text-white font-mono">{train.arrivalTime}</span>
-                        <span className="text-xs font-bold text-sky-400 block">{train.toStation} ({train.toCode})</span>
-                        <span className="text-[10px] text-slate-400">Platform #{train.toPf}</span>
+                      {/* Arrival */}
+                      <div className="col-span-4 text-right">
+                        <span className="text-2xl font-black text-white font-mono leading-none block">
+                          {train.arrivalTime}
+                        </span>
+                        <span className="text-xs font-bold text-sky-400 block mt-1 truncate">
+                          {train.toStation} ({train.toCode})
+                        </span>
+                        <span className="text-[10px] text-slate-400 block">
+                          Platform #{train.toPf}
+                        </span>
                       </div>
 
                     </div>
 
-                    {/* Action CTA Buttons */}
-                    <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-900">
-                      <button
-                        onClick={() => setCoachModalTrain(train)}
-                        className="bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs px-3.5 py-2 rounded-xl transition-all border border-slate-800 flex items-center space-x-1.5 cursor-pointer"
-                      >
-                        <Layers className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Coach Layout</span>
-                      </button>
+                    {/* Action Footer */}
+                    <div className="pt-3 border-t border-slate-700/60 flex flex-wrap items-center justify-between gap-3 text-xs">
+                      
+                      <div className="flex items-center space-x-2 text-slate-400 text-[11px]">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Official IRCTC Verified Schedule</span>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => setSelectedRouteTrain(train)}
+                          className="bg-slate-700 hover:bg-slate-600 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer"
+                        >
+                          <Navigation className="w-3.5 h-3.5 text-amber-400" />
+                          <span>View Route Stops</span>
+                        </button>
+
+                        <button
+                          onClick={() => setCoachModalTrain(train)}
+                          className="bg-sky-600 hover:bg-sky-500 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center space-x-1.5 cursor-pointer shadow-md"
+                        >
+                          <Layers className="w-3.5 h-3.5" />
+                          <span>Coach Layout</span>
+                        </button>
+                      </div>
+
                     </div>
 
                   </div>
@@ -555,176 +521,226 @@ export default function WhereIsMyTrain({ initialFrom = '', initialTo = '' }) {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* TAB 2: LIVE STATION BOARD                                                */}
-        {/* ========================================================================= */}
-        {activeSubTab === 'station' && (
-          <div className="space-y-8 animate-fadeIn">
+        {/* TAB 2: STATION LIVE BOARD */}
+        {activeTab === 'station' && (
+          <div className="max-w-4xl mx-auto space-y-6">
             
-            {/* Station Query Input Box */}
-            <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl max-w-3xl mx-auto">
-              <form onSubmit={handleSearchStationBoard} className="flex gap-2">
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md">
+              <h3 className="text-lg font-bold text-white mb-2 flex items-center">
+                <Building className="w-5 h-5 text-amber-400 mr-2" />
+                <span>Station Arrivals & Departures Board</span>
+              </h3>
+              <p className="text-xs text-slate-400 mb-4">
+                Select any station across India to view all passing and departing train schedules in real-time.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
+                  <MapPin className="w-4 h-4 text-amber-400 absolute left-3.5 top-3.5" />
                   <input
                     type="text"
-                    value={stationQuery}
-                    onChange={(e) => setStationQuery(e.target.value)}
-                    placeholder="Enter Station Code or City (e.g. RJY, VSKP, NDLS, BZA, MAS)..."
-                    className="w-full bg-slate-900 border border-slate-800 rounded-2xl px-4 py-3.5 text-white text-sm font-semibold focus:outline-none focus:border-amber-500 transition-all pl-10"
-                  />
-                  <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-4" />
-                </div>
-                <button
-                  type="submit"
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-3.5 rounded-2xl text-xs transition-all shadow-lg shadow-amber-500/20 flex items-center space-x-1.5 flex-shrink-0 cursor-pointer"
-                >
-                  <Clock className="w-4 h-4" />
-                  <span>Get Station Board</span>
-                </button>
-              </form>
-
-              {/* Quick Station Chips */}
-              <div className="mt-3 flex items-center space-x-2 text-xs overflow-x-auto">
-                <span className="text-slate-500 font-bold text-[10px]">Popular Stations:</span>
-                {['RJY', 'VSKP', 'NDLS', 'BZA', 'MAS', 'HWH', 'SC', 'HYB', 'CSMT'].map((code) => (
-                  <button
-                    key={code}
-                    onClick={() => {
-                      setStationQuery(code);
-                      setStationBoardData(getLiveStationBoard(code));
+                    value={boardStationInput}
+                    onChange={(e) => {
+                      setBoardStationInput(e.target.value);
+                      if (e.target.value.trim().length >= 1) {
+                        setBoardSuggestions(searchStations(e.target.value));
+                      } else {
+                        setBoardSuggestions([]);
+                      }
                     }}
-                    className="bg-slate-900 hover:bg-slate-800 text-amber-400 px-2.5 py-0.5 rounded-full border border-slate-800 font-mono text-[11px] transition-colors"
-                  >
-                    {code}
-                  </button>
-                ))}
+                    placeholder="Enter Station Code or Name (e.g. NDLS, VSKP, BZA, SBC, HWH)..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-10 pr-3 py-2.5 text-sm font-bold text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  />
+
+                  {boardSuggestions.length > 0 && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-xl shadow-2xl z-30 max-h-56 overflow-y-auto">
+                      {boardSuggestions.map((st) => (
+                        <div
+                          key={st.code}
+                          onClick={() => {
+                            setBoardStationInput(`${st.name} (${st.code})`);
+                            setBoardStationQuery(st.code);
+                            setBoardSuggestions([]);
+                          }}
+                          className="px-4 py-2.5 hover:bg-slate-700 cursor-pointer flex justify-between items-center text-xs border-b border-slate-700/50"
+                        >
+                          <span className="font-bold text-white">{st.name}</span>
+                          <span className="font-mono font-extrabold text-amber-400 bg-slate-900 px-2 py-0.5 rounded">{st.code}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    setBoardStationQuery(boardStationInput);
+                    setBoardSuggestions([]);
+                  }}
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs shadow-md cursor-pointer"
+                >
+                  Load Station Board
+                </button>
               </div>
             </div>
 
-            {/* Station Board Display */}
-            {stationBoardData && (
-              <div className="max-w-4xl mx-auto space-y-6">
-                
-                <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl">
-                  
-                  <div className="flex justify-between items-center border-b border-slate-800 pb-4 mb-6">
-                    <div>
-                      <h3 className="text-xl font-extrabold text-white">
-                        {stationBoardData.stationName} ({stationBoardData.stationCode})
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {stationBoardData.city}, {stationBoardData.state} • {stationBoardData.totalPlatforms} Platforms
-                      </p>
-                    </div>
-                    <span className="bg-amber-950 text-amber-400 text-xs font-bold px-3 py-1 rounded-full border border-amber-800">
-                      Live Next 4 Hours
-                    </span>
-                  </div>
+            {/* Live Station Board Card */}
+            <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-6 shadow-xl">
+              <div className="flex justify-between items-center pb-4 border-b border-slate-700/60">
+                <div>
+                  <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">Live Board</span>
+                  <h4 className="text-xl font-black text-white">{stationBoardData.stationName} ({stationBoardData.stationCode})</h4>
+                </div>
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-xs font-bold">
+                  {stationBoardData.totalPassingTrains} Trains Scheduled
+                </span>
+              </div>
 
-                  <div className="space-y-4">
-                    {stationBoardData.upcomingTrains.map((tr, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-slate-900/60 p-4 rounded-2xl border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:border-slate-700 transition-all"
-                      >
+              <div className="mt-4 space-y-2">
+                {stationBoardData.upcomingTrains.length === 0 ? (
+                  <p className="text-xs text-slate-400 py-4 text-center">No upcoming trains found for this station.</p>
+                ) : (
+                  stationBoardData.upcomingTrains.map((tr, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-700/50 text-xs"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="bg-amber-500 text-slate-950 font-mono font-black text-xs px-2 py-0.5 rounded">
+                          #{tr.trainNumber}
+                        </span>
                         <div>
-                          <div className="flex items-center space-x-2">
-                            <span className="bg-amber-500 text-slate-950 font-mono font-black text-xs px-2 py-0.5 rounded">
-                              {tr.trainNumber}
-                            </span>
-                            <span className="font-extrabold text-white text-sm">{tr.trainName}</span>
-                          </div>
-                          <span className="text-[11px] text-slate-400 block mt-1">
-                            Destination: <strong className="text-slate-200">{tr.destination}</strong> • Platform #{tr.platform}
-                          </span>
-                        </div>
-
-                        <div className="text-right">
-                          <span className="text-sm font-mono font-bold text-white block">
-                            Arr: {tr.arrTime} | Dep: {tr.depTime}
-                          </span>
-                          <span className={`text-[11px] font-bold block mt-0.5 ${
-                            tr.isDelayed ? 'text-rose-400' : 'text-emerald-400'
-                          }`}>
-                            {tr.status}
-                          </span>
+                          <span className="font-extrabold text-white block">{tr.trainName}</span>
+                          <span className="text-[10px] text-sky-400 font-semibold">{tr.trainType}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                </div>
-
+                      <div className="text-right">
+                        <span className="font-mono font-bold text-white block text-sm">{tr.dep || tr.arr}</span>
+                        <span className="text-[10px] text-slate-400">Day {tr.day}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-            )}
+            </div>
 
           </div>
         )}
 
-
-
       </div>
 
-      {/* ========================================================================= */}
-      {/* COACH COMPOSITION MODAL                                                    */}
-      {/* ========================================================================= */}
-      {coachModalTrain && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-2xl w-full space-y-6 shadow-2xl animate-fadeIn relative">
+      {/* FULL ROUTE SCHEDULE DRAWER MODAL */}
+      {selectedRouteTrain && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden animate-fadeIn">
             
-            <button
-              onClick={() => setCoachModalTrain(null)}
-              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-full bg-slate-800 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="bg-amber-500 text-slate-950 font-mono font-black text-xs px-2 py-0.5 rounded">
-                  {coachModalTrain.number}
+            <div className="p-5 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+              <div>
+                <span className="bg-amber-500 text-slate-950 font-mono font-black text-xs px-2.5 py-0.5 rounded mr-2">
+                  #{selectedRouteTrain.number}
                 </span>
-                <h3 className="font-extrabold text-white text-lg">{coachModalTrain.name}</h3>
+                <span className="font-extrabold text-white text-base">{selectedRouteTrain.name}</span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
-                Coach Composition Diagram & Platform Standing Position
-              </p>
+
+              <button
+                onClick={() => setSelectedRouteTrain(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
-            {/* Coach Layout Horizontal Strip */}
-            {(() => {
-              const comp = getCoachComposition(coachModalTrain.type);
-              return (
-                <div className="space-y-4">
-                  
-                  <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                    <div className="flex items-center space-x-2 overflow-x-auto pb-2">
-                      {comp.coaches.map((c, idx) => (
-                        <div
-                          key={idx}
-                          className={`flex-shrink-0 px-3 py-2 rounded-xl text-xs font-mono font-bold text-center border ${
-                            c === 'ENG'
-                              ? 'bg-rose-950 text-rose-400 border-rose-800'
-                              : c.startsWith('B') || c.startsWith('A') || c.startsWith('H')
-                              ? 'bg-sky-950 text-sky-400 border-sky-800'
-                              : 'bg-slate-800 text-slate-300 border-slate-700'
-                          }`}
-                        >
-                          <span className="block text-[10px] opacity-75">{idx + 1}</span>
-                          <span>{c}</span>
-                        </div>
-                      ))}
+            <div className="p-5 overflow-y-auto space-y-2 flex-1">
+              <h5 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                Complete Route Station Schedule ({selectedRouteTrain.schedule ? selectedRouteTrain.schedule.length : 0} Stops)
+              </h5>
+
+              {(selectedRouteTrain.schedule || []).map((st, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 bg-slate-800/60 rounded-xl border border-slate-700/50 text-xs"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="w-6 h-6 bg-slate-700 text-amber-400 rounded-full flex items-center justify-center font-mono text-[10px] font-bold">
+                      {i + 1}
+                    </span>
+                    <div>
+                      <span className="font-bold text-white block">{st.name}</span>
+                      <span className="font-mono text-[10px] text-amber-400 font-extrabold">{st.code}</span>
                     </div>
                   </div>
 
-                  <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-xl text-xs text-amber-300 flex items-center space-x-2">
-                    <Info className="w-4 h-4 flex-shrink-0 text-amber-400" />
-                    <span>{comp.platformPosition}</span>
+                  <div className="text-right font-mono">
+                    <span className="text-slate-300 block">Arr: <strong>{st.arr}</strong> | Dep: <strong>{st.dep}</strong></span>
+                    <span className="text-[10px] text-slate-500">Day {st.day}</span>
                   </div>
-
                 </div>
-              );
-            })()}
+              ))}
+            </div>
+
+            <div className="p-4 bg-slate-800 border-t border-slate-700 text-right">
+              <button
+                onClick={() => setSelectedRouteTrain(null)}
+                className="bg-amber-500 text-slate-950 font-bold px-6 py-2 rounded-xl text-xs"
+              >
+                Close Route View
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* COACH LAYOUT DRAWER MODAL */}
+      {coachModalTrain && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-5 animate-fadeIn">
+            
+            <div className="flex justify-between items-center pb-3 border-b border-slate-700">
+              <div>
+                <span className="text-xs text-amber-400 font-bold uppercase tracking-wider block">Coach Composition Map</span>
+                <h4 className="text-lg font-extrabold text-white">#{coachModalTrain.number} - {coachModalTrain.name}</h4>
+              </div>
+              <button
+                onClick={() => setCoachModalTrain(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-xs text-slate-400">
+                Visual coach sequence from Engine to Guard Van:
+              </p>
+
+              <div className="flex flex-wrap gap-2 text-xs font-mono font-bold">
+                {['ENG', 'GS', 'GS', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'B1', 'B2', 'B3', 'A1', 'H1', 'SLR'].map((c, i) => (
+                  <span
+                    key={i}
+                    className={`px-3 py-2 rounded-xl border ${
+                      c === 'ENG'
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                        : c.startsWith('B') || c.startsWith('A') || c.startsWith('H')
+                        ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-700 text-right">
+              <button
+                onClick={() => setCoachModalTrain(null)}
+                className="bg-amber-500 text-slate-950 font-bold px-6 py-2 rounded-xl text-xs"
+              >
+                Close Coach Map
+              </button>
+            </div>
 
           </div>
         </div>
