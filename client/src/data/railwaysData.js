@@ -284,9 +284,9 @@ function normalizeName(str) {
     .trim();
 }
 
-function getTrainRunningDays(numStr, nameStr) {
-  const nameUpper = (nameStr || '').toUpperCase();
-  const numInt = parseInt(numStr) || 0;
+function getTrainRunningDays(trainNum, trainName) {
+  const nameUpper = (trainName || '').toUpperCase();
+  const numInt = parseInt(trainNum) || 0;
   const daysMap = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   if (nameUpper.includes('WEEKLY') || nameUpper.includes('WKLY') || nameUpper.includes('1 DAY')) {
@@ -298,15 +298,26 @@ function getTrainRunningDays(numStr, nameStr) {
   if (nameUpper.includes('TRI-WEEKLY') || nameUpper.includes('TRI WEEKLY') || nameUpper.includes('TRIWEEKLY') || nameUpper.includes('3 DAYS')) {
     return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 4) % 7]];
   }
-  if (nameUpper.includes('HUMSAFAR') || nameUpper.includes('SUVIDHA') || nameUpper.includes('SPL') || nameUpper.includes('SPECIAL')) {
-    if (numInt % 2 === 0) {
-      return [daysMap[numInt % 7]];
-    } else {
-      return [daysMap[numInt % 7], daysMap[(numInt + 4) % 7]];
-    }
-  }
-  if (nameUpper.includes('SAMPARK KRANTI') || nameUpper.includes('GARIB RATH') || nameUpper.includes('AC EXP')) {
+  if (trainNum.startsWith('0') || nameUpper.includes('SPECIAL') || nameUpper.includes('SPL')) {
+    if (numInt % 3 === 0) return [daysMap[numInt % 7]];
+    if (numInt % 3 === 1) return [daysMap[numInt % 7], daysMap[(numInt + 3) % 7]];
     return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 5) % 7]];
+  }
+  if (nameUpper.includes('HUMSAFAR') || nameUpper.includes('SUVIDHA') || nameUpper.includes('PREMIUM')) {
+    return [daysMap[numInt % 7], daysMap[(numInt + 4) % 7]];
+  }
+  if (nameUpper.includes('SAMPARK KRANTI') || nameUpper.includes('GARIB RATH')) {
+    return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 4) % 7]];
+  }
+  if (numInt >= 10000 && numInt <= 29999) {
+    const modulo = numInt % 10;
+    if (modulo === 5) {
+      return [daysMap[numInt % 7], daysMap[(numInt + 2) % 7], daysMap[(numInt + 4) % 7]];
+    } else if (modulo === 7) {
+      return [daysMap[numInt % 7], daysMap[(numInt + 3) % 7]];
+    } else if (modulo === 9) {
+      return [daysMap[numInt % 7]];
+    }
   }
 
   return ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -518,9 +529,9 @@ export function findTrainsBetweenStations(fromQuery = '', toQuery = '', query = 
         const toStop = train.schedule[bestToIdx];
 
         const intermediateStops = bestToIdx - bestFromIdx;
-        const estDistanceKm = intermediateStops * 42;
-        const durHours = Math.max(1, Math.round(intermediateStops * 0.8));
-        const durStr = `${durHours}h ${(intermediateStops * 7) % 60}m`;
+        const estDistanceKm = intermediateStops * 48;
+        const durHours = Math.max(1, Math.round(intermediateStops * 0.9));
+        const durStr = `${durHours}h ${(intermediateStops * 8) % 60}m`;
 
         matched.push({
           number: train.number,
